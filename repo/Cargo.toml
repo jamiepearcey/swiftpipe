@@ -2,6 +2,8 @@
 members = [
     "crates/swift-api",
     "crates/swift-cli",
+    "crates/ingest-core",
+    "crates/ingest-tabular",
     "crates/swift-core",
     "crates/swift-db",
     "crates/swift-duckdb",

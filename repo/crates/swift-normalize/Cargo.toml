@@ -6,8 +6,8 @@ rust-version = "1.82"
 publish = false
 
 [dependencies]
+ingest-core = { path = "../ingest-core" }
 swift-db = { path = "../swift-db" }
-serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 swift-core = { path = "../swift-core" }

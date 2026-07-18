@@ -1,35 +1,21 @@
-//! Normalize swiftpipe's parsed SWIFT securities messages into platform events.
-//!
-//! This is the **source-adapter seam** of the finance platform (ADR-0001):
-//! swiftpipe is the first *source*, and this crate maps its output — the generic
-//! `settlement_*` rows from [`swift_db::materialize_message`] — into typed
-//! [`SecurityEvent`]s the P&L/risk engine can consume, extracting the ISIN from
-//! the raw `:35B:` instrument blob (which swiftpipe leaves as text).
+//! The **SWIFT** source adapter — one implementation of the platform's
+//! source-agnostic ingestion contract ([`ingest_core`]). It maps swiftpipe's
+//! `materialize_message` output (the generic `settlement_*` rows) into normalized
+//! [`SecurityEvent`]s, sub-parsing the ISIN from the raw `:35B:` blob swiftpipe
+//! leaves as text. The normalized model + trait live in `ingest-core`; SWIFT
+//! knows nothing the other adapters (tabular/FIX/API) don't also produce.
 //!
 //! Scope: securities settlement / holdings / trade-confirmation flows (MT535,
-//! MT536-538, MT540-548, MT515). The mapping is intentionally resilient — it
-//! scans the normalized rows by meaning rather than assuming exact column names,
-//! so schema tweaks don't break it. Deliberately out of scope (net-new in
-//! swiftpipe, tracked as follow-ons): cash statements (MT940/942/950), holdings
-//! *balance* semantics (aggregate/available/blocked quantities, market value),
-//! and MX/ISO20022.
+//! MT536-538, MT540-548, MT515). Resilient scan-by-meaning (not exact column
+//! names). Out of scope (net-new in swiftpipe): cash (MT940/942/950), holdings
+//! *balance* semantics, MX/ISO20022.
 
-use serde::Serialize;
+use ingest_core::{extract_isin, EventKind, SecurityEvent, SecuritySource};
 use swift_db::{NormalizedRow, ParsedOutputBatch};
 
-/// What a message means, derived from its type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum EventKind {
-    /// MT535 — statement of holdings.
-    Holding,
-    /// MT536-538, MT540-548 — statement of transactions / settlement.
-    Settlement,
-    /// MT515/518 — trade confirmation.
-    TradeConfirm,
-    #[default]
-    Other,
-}
+// Re-export the shared model so existing consumers of this crate keep working.
+pub use ingest_core::{is_isin, EventKind as Kind, SecurityEvent as Event};
+pub use ingest_core::extract_isin as extract_isin_blob;
 
 /// Classify a SWIFT message type into a platform event kind.
 pub fn classify(message_type: &str) -> EventKind {
@@ -42,24 +28,21 @@ pub fn classify(message_type: &str) -> EventKind {
     }
 }
 
-/// A normalized securities event — the platform's read of one custodian message.
-#[derive(Debug, Clone, PartialEq, Default, Serialize)]
-pub struct SecurityEvent {
-    pub message_id: String,
-    pub message_type: String,
-    pub kind: EventKind,
-    /// ISIN extracted from the `:35B:` instrument blob (when present).
-    pub isin: Option<String>,
-    /// The remaining instrument description text.
-    pub instrument_desc: Option<String>,
-    pub quantity: Option<f64>,
-    pub settlement_date: Option<String>,
-    pub safekeeping_account: Option<String>,
-    pub party_bic: Option<String>,
+/// The SWIFT source adapter.
+pub struct SwiftSource;
+
+impl SecuritySource for SwiftSource {
+    type Input<'a> = &'a ParsedOutputBatch;
+    fn source_id(&self) -> &'static str {
+        "swift"
+    }
+    fn ingest(&self, batch: Self::Input<'_>) -> Vec<SecurityEvent> {
+        normalize(batch)
+    }
 }
 
-/// Map a materialized message batch into normalized securities events (one per
-/// message in the batch; multi-holding sequence grouping is a follow-on).
+/// Map a materialized SWIFT message batch into normalized securities events (one
+/// per message; multi-holding sequence grouping is a follow-on).
 pub fn normalize(batch: &ParsedOutputBatch) -> Vec<SecurityEvent> {
     batch
         .raw_messages
@@ -70,12 +53,14 @@ pub fn normalize(batch: &ParsedOutputBatch) -> Vec<SecurityEvent> {
                 return None;
             }
             let rows: Vec<&NormalizedRow> = batch.normalized_rows.iter().collect();
+            let (isin, instrument_desc) = scan_isin(&rows);
             Some(SecurityEvent {
+                source: "swift".to_string(),
                 message_id: msg.message_id.clone(),
                 message_type: msg.message_type.clone(),
                 kind,
-                isin: scan_isin(&rows).0,
-                instrument_desc: scan_isin(&rows).1,
+                isin,
+                instrument_desc,
                 quantity: scan_column(&rows, |t, c| t == "settlement_quantity" && c == "quantity")
                     .or_else(|| scan_column(&rows, |_, c| c == "quantity"))
                     .and_then(|v| v.parse::<f64>().ok()),
@@ -116,38 +101,6 @@ fn scan_isin(rows: &[&NormalizedRow]) -> (Option<String>, Option<String>) {
     (None, None)
 }
 
-/// Extract an ISIN from a raw `:35B:` blob like `"ISIN GB00B03MLX29\nACME PLC ORD"`.
-/// Returns `(isin, description)`. An ISIN is `ISIN ` followed by a 12-character
-/// alphanumeric code (2 leading letters).
-pub fn extract_isin(blob: &str) -> (Option<String>, Option<String>) {
-    let mut isin = None;
-    let mut desc: Vec<&str> = Vec::new();
-    for line in blob.split(['\n', '\r']) {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
-        }
-        if isin.is_none() {
-            if let Some(code) = line.strip_prefix("ISIN ").map(str::trim) {
-                if is_isin(code) {
-                    isin = Some(code.to_string());
-                    continue;
-                }
-            }
-        }
-        desc.push(line);
-    }
-    let desc = if desc.is_empty() { None } else { Some(desc.join(" ")) };
-    (isin, desc)
-}
-
-fn is_isin(s: &str) -> bool {
-    s.len() == 12
-        && s.is_ascii()
-        && s.bytes().all(|b| b.is_ascii_alphanumeric())
-        && s.bytes().take(2).all(|b| b.is_ascii_alphabetic())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,20 +110,6 @@ mod tests {
 
     const MT535_FIN: &str = include_str!("../../../examples/mt535_sample.fin");
     const MT535_SCHEMA: &str = include_str!("../../../examples/schemas/mt535.yaml");
-
-    #[test]
-    fn extract_isin_from_35b_blob() {
-        let (isin, desc) = extract_isin("ISIN GB00B03MLX29\nACME PLC ORD");
-        assert_eq!(isin.as_deref(), Some("GB00B03MLX29"));
-        assert_eq!(desc.as_deref(), Some("ACME PLC ORD"));
-    }
-
-    #[test]
-    fn is_isin_rejects_non_isin() {
-        assert!(!is_isin("ACME PLC ORD"));
-        assert!(!is_isin("GB00B03MLX2")); // 11 chars
-        assert!(is_isin("US0378331005"));
-    }
 
     #[test]
     fn classify_message_types() {
@@ -192,15 +131,15 @@ mod tests {
         let parsed = parse_message(inbound.body.as_bytes());
         let batch = materialize_message(&catalog, &inbound, &parsed).expect("materialize");
 
-        let events = normalize(&batch);
-        assert_eq!(events.len(), 1, "one holding event for the single-holding fixture");
+        // via the trait, to exercise the source-agnostic contract
+        let events = SwiftSource.ingest(&batch);
+        assert_eq!(events.len(), 1);
         let e = &events[0];
+        assert_eq!(e.source, "swift");
         assert_eq!(e.kind, EventKind::Holding);
-        // The wedge's core: ISIN extracted from the raw :35B: blob, quantity parsed.
         assert_eq!(e.isin.as_deref(), Some("GB00B03MLX29"));
         assert_eq!(e.quantity, Some(1000.0));
-        // Present-but-not-brittle (exact values depend on schema column choices).
-        assert!(e.settlement_date.is_some(), "settlement date populated");
-        assert!(e.safekeeping_account.is_some(), "safekeeping account populated");
+        assert!(e.settlement_date.is_some());
+        assert!(e.safekeeping_account.is_some());
     }
 }
