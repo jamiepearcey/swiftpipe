@@ -1,0 +1,10 @@
+[package]
+name = "swift-mt940"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+ingest-core = { path = "../ingest-core" }
+swift-core = { path = "../swift-core" }

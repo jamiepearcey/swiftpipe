@@ -7,6 +7,7 @@ members = [
     "crates/swift-core",
     "crates/swift-db",
     "crates/swift-duckdb",
+    "crates/swift-mt940",
     "crates/swift-normalize",
     "crates/swift-schema",
 ]
