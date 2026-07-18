@@ -1609,6 +1609,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingest-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "ingest-tabular"
+version = "0.1.0"
+dependencies = [
+ "ingest-core",
+]
+
+[[package]]
 name = "inout"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1930,6 +1944,14 @@ dependencies = [
  "libc",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "mx-camt"
+version = "0.1.0"
+dependencies = [
+ "ingest-core",
+ "roxmltree",
 ]
 
 [[package]]
@@ -2647,6 +2669,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "roxmltree"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
+
+[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3327,10 +3355,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "swift-mt940"
+version = "0.1.0"
+dependencies = [
+ "ingest-core",
+ "swift-core",
+]
+
+[[package]]
 name = "swift-normalize"
 version = "0.1.0"
 dependencies = [
- "serde",
+ "ingest-core",
  "swift-core",
  "swift-db",
  "swift-schema",
