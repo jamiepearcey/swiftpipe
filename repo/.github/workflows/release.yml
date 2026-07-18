@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: release
+
+      - name: Build release binaries
+        run: cargo build --release -p swift-cli -p swift-api
+
+      - name: Install cargo-dist
+        run: cargo install cargo-dist --version 0.32.0 --locked
+
+      - name: Validate cargo-dist release plan
+        run: dist plan --allow-dirty
+
+      - name: Install git-cliff
+        run: cargo install git-cliff --version 2.13.1 --locked
+
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git cliff --config cliff.toml --current > dist/RELEASE_NOTES.md
+
+      - name: Package release binaries
+        run: |
+          set -euo pipefail
+          mkdir -p dist/pkg
+          cp target/release/swiftpipe dist/pkg/
+          cp target/release/swiftpipe-api dist/pkg/
+          tar -C dist/pkg -czf "dist/swiftpipe-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.tar.gz" swiftpipe swiftpipe-api
+          (cd dist && sha256sum "swiftpipe-${GITHUB_REF_NAME}-x86_64-unknown-linux-gnu.tar.gz" > SHA256SUMS)
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS --title "$GITHUB_REF_NAME" --notes-file dist/RELEASE_NOTES.md
+          fi
+
+      - name: Set Docker image name
+        id: image
+        run: echo "image_name=ghcr.io/${GITHUB_REPOSITORY,,}/swiftpipe-api" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ${{ steps.image.outputs.image_name }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.image_name }}:sha-${{ github.sha }}

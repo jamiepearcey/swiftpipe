@@ -1,0 +1,75 @@
+# Starter settlement instruction schemas for parseable settlement-style MT messages.
+# Not a certified SRU reproduction. These schemas model the common settlement
+# instruction structure and normalize to shared entities.
+field_types:
+  - name: settlement_reference
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: value
+  - name: settlement_date
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: capture
+        name: date
+        value_type: digits
+        length: 8
+  - name: settlement_datetime_text
+    pattern:
+      - kind: rest
+        name: value
+  - name: settlement_quantity
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: quantity
+  - name: settlement_amount
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: amount
+  - name: settlement_qualified_code
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: code
+  - name: settlement_text
+    pattern:
+      - kind: rest
+        name: value
+

@@ -1,0 +1,29 @@
+[package]
+name = "swift-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+swift-core = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "parse_message_fuzz"
+path = "fuzz_targets/parse_message_fuzz.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parse_text_fields_fuzz"
+path = "fuzz_targets/parse_text_fields_fuzz.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,375 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: Check & Lint (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - stable
+          - beta
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: ci-${{ matrix.toolchain }}
+
+      - name: Install cargo-sort
+        run: cargo install cargo-sort --version 2.1.4 --locked
+
+      - name: Cargo manifest sort check
+        run: cargo sort --workspace --check
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: ShellCheck scripts
+        run: shellcheck scripts/*.sh
+
+      - name: Actionlint workflows
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+        with:
+          args: .github/workflows/ci.yml .github/workflows/release.yml
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Bench compile check
+        run: cargo bench --workspace --no-run
+
+  test:
+    name: Test (${{ matrix.crate }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        crate:
+          - swift-core
+          - swift-schema
+          - swift-db
+          - swift-duckdb
+          - swift-cli
+          - swift-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: test-${{ matrix.crate }}
+
+      - name: Test crate
+        run: cargo test -p ${{ matrix.crate }}
+
+  docs:
+    name: Rustdoc
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: docs
+
+      - name: Build workspace docs
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps
+
+  ui:
+    name: UI Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Audit UI runtime dependencies
+        working-directory: ui
+        run: npm audit --omit=dev
+
+      - name: Lint UI
+        working-directory: ui
+        run: npm run lint
+
+      - name: Test UI
+        working-directory: ui
+        run: npm run test
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
+
+      - name: Upload UI dist artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: swiftpipe-ui-dist
+          path: ui/dist
+          if-no-files-found: error
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: coverage
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --version 0.8.7 --locked
+
+      - name: Generate coverage report
+        run: cargo llvm-cov --workspace --all-targets --lcov --output-path target/llvm-cov/lcov.info
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: swiftpipe-coverage-lcov
+          path: target/llvm-cov/lcov.info
+          if-no-files-found: error
+
+  msrv:
+    name: MSRV Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@f2dd9f8ae5c180b960971aa7ebe1779681fbbda4 # 1.82
+
+      - name: Cache Cargo registry + build artifacts
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: msrv
+
+      - name: Check workspace
+        run: cargo check --workspace --all-targets
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: audit
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.21.2 --locked
+
+      - name: Run audit
+        run: cargo audit
+
+  osv:
+    name: OSV Scanner
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      scan-args: |-
+        --lockfile=Cargo.lock
+
+  sbom:
+    name: SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          path: .
+          format: spdx-json
+          artifact-name: swiftpipe-sbom.spdx.json
+          output-file: swiftpipe-sbom.spdx.json
+
+  deny:
+    name: Supply Chain Policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: deny
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.17.0 --locked
+
+      - name: Run cargo deny
+        run: cargo deny check
+
+  machete:
+    name: Unused Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: machete
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --version 0.9.2 --locked
+
+      - name: Run cargo machete
+        run: cargo machete
+
+  udeps:
+    name: Nightly Unused Dependency Check
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@5b842231ba77f5c045dba54ac5560fed2db780e2 # nightly
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@42dc69e1aa15d09112580998cf2ef0119e2e91ae # v2
+        with:
+          key: ${{ hashFiles('Cargo.lock') }}
+          shared-key: udeps
+
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --version 0.1.61 --locked
+
+      - name: Run cargo udeps
+        run: cargo udeps --workspace --all-targets
+
+  hadolint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Run hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  docker:
+    name: Docker build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: swiftpipe-api:ci
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: swiftpipe-api:ci
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          trivyignores: .trivyignore
+
+      - name: docker-runtime-user
+        run: |
+          docker build -t swiftpipe:check .
+          test "$(docker run --rm --entrypoint id swiftpipe:check -u)" = "10001"

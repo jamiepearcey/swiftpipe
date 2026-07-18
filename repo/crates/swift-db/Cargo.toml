@@ -1,0 +1,17 @@
+[package]
+name = "swift-db"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+swift-core = { path = "../swift-core" }
+swift-schema = { path = "../swift-schema" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "materialize_message"
+harness = false

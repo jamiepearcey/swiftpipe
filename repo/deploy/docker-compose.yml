@@ -1,0 +1,64 @@
+services:
+  api:
+    image: ${SWIFTPIPE_IMAGE:-swiftpipe:check}
+    command:
+      - --listen
+      - 0.0.0.0:8080
+      - --schema-path
+      - /app/schemas
+      - --object-root
+      - /data/objects
+      - --work-root
+      - /data/work
+      - --ui-dist
+      - /app/ui
+      - --system-of-record
+      - postgres
+      - --postgres-connection
+      - postgres://swiftpipe:swiftpipe@postgres:5432/swiftpipe
+      - --system-record-schema
+      - swiftpipe
+    environment:
+      RUST_LOG: ${RUST_LOG:-swiftpipe_api=info,tower_http=warn}
+      SWIFTPIPE_LOG_FORMAT: ${SWIFTPIPE_LOG_FORMAT:-json}
+    ports:
+      - "${SWIFTPIPE_API_PORT:-18080}:8080"
+    volumes:
+      - swiftpipe-objects:/data/objects
+      - swiftpipe-work:/data/work
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: swiftpipe
+      POSTGRES_USER: swiftpipe
+      POSTGRES_PASSWORD: swiftpipe
+    ports:
+      - "${SWIFTPIPE_POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - swiftpipe-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swiftpipe -d swiftpipe"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-swiftpipe}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${SWIFTPIPE_GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - swiftpipe-grafana:/var/lib/grafana
+
+volumes:
+  swiftpipe-objects:
+  swiftpipe-work:
+  swiftpipe-postgres:
+  swiftpipe-grafana:

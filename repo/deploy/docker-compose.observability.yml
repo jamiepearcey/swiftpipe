@@ -1,0 +1,42 @@
+services:
+  grafana:
+    volumes:
+      - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/swiftpipe.yml:ro
+    depends_on:
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+
+  loki:
+    image: grafana/loki:3.3.2
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "${SWIFTPIPE_LOKI_PORT:-3100}:3100"
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command:
+      - -config.file=/etc/tempo/tempo.yml
+    ports:
+      - "${SWIFTPIPE_TEMPO_PORT:-3200}:3200"
+      - "${SWIFTPIPE_OTLP_GRPC_PORT:-4317}:4317"
+      - "${SWIFTPIPE_OTLP_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./observability/tempo.yml:/etc/tempo/tempo.yml:ro
+      - swiftpipe-tempo:/var/tempo
+
+  promtail:
+    image: grafana/promtail:3.3.2
+    command:
+      - -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./observability/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      loki:
+        condition: service_started
+
+volumes:
+  swiftpipe-tempo:

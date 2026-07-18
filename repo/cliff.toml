@@ -1,0 +1,48 @@
+[changelog]
+header = """
+# Changelog
+
+All notable changes to SwiftPipe will be documented in this file.
+"""
+body = """
+
+{% if version %}\
+## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## Unreleased
+{% endif %}\
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first }}\
+{% if commit.remote.pr_number %} (#{{ commit.remote.pr_number }}){% endif %}
+{% endfor %}
+{% endfor %}\
+"""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9]*"
+sort_commits = "oldest"
+
+commit_parsers = [
+  { message = "^feat", group = "features" },
+  { message = "^fix", group = "fixes" },
+  { message = "^perf", group = "performance" },
+  { message = "^sec", group = "security" },
+  { message = "^obs", group = "observability" },
+  { message = "^ops", group = "operations" },
+  { message = "^docs", group = "documentation" },
+  { message = "^test", group = "testing" },
+  { message = "^cicd", group = "ci/cd" },
+  { message = "^ci", group = "ci/cd" },
+  { message = "^refactor", group = "refactors" },
+  { message = "^chore", group = "chores" },
+  { message = "^.*", group = "other" },
+]

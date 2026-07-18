@@ -1,0 +1,16 @@
+target/
+.swiftpipe-bench/
+.swiftpipe-objects*/
+.swiftpipe-work*/
+examples/.uhb/
+examples/**/*-output/
+examples/**/demo-output/
+examples/**/*.duckdb
+examples/**/*.duckdb.wal
+
+.git/
+.DS_Store
+**/.DS_Store
+*.profraw
+*.profdata
+**/*.rs.bk

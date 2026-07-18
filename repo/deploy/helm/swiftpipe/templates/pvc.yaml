@@ -1,0 +1,33 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "swiftpipe.fullname" . }}-objects
+  labels:
+    {{- include "swiftpipe.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.objects.size }}
+  {{- if .Values.persistence.objects.storageClassName }}
+  storageClassName: {{ .Values.persistence.objects.storageClassName | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "swiftpipe.fullname" . }}-work
+  labels:
+    {{- include "swiftpipe.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.work.size }}
+  {{- if .Values.persistence.work.storageClassName }}
+  storageClassName: {{ .Values.persistence.work.storageClassName | quote }}
+  {{- end }}
+{{- end }}

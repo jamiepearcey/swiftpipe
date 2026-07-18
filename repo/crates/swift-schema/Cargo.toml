@@ -1,0 +1,25 @@
+[package]
+name = "swift-schema"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+smallvec = "1.13"
+swift-core = { path = "../swift-core" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+expect-test = "1.5"
+serde_json = "1"
+
+[[bench]]
+name = "infer_database_layout"
+harness = false
+
+[[bench]]
+name = "render_allocations"
+harness = false

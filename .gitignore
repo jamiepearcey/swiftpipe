@@ -1,0 +1,23 @@
+# Rust build output (the workspace uses an external CARGO_TARGET_DIR; ignore any local one)
+/target
+target/
+**/*.rs.bk
+
+# Node / frontend build
+node_modules/
+dist/
+
+# swiftpipe runtime / generated working dirs
+.swiftpipe-objects/
+.swiftpipe-work/
+.swiftpipe-work-ui/
+out/
+
+# Generated DuckDB stores (regenerable from the .fin fixtures + documented commands)
+*.duckdb
+*.duckdb.wal
+
+# OS / env
+.DS_Store
+.env
+.env.*

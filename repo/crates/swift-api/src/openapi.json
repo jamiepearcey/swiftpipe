@@ -1,0 +1,304 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SwiftPipe API",
+    "version": "1",
+    "description": "Self-hosted SWIFT FIN message processing API. Upload FIN files or submit batch prefix jobs; poll for completion; retrieve artifacts."
+  },
+  "servers": [{ "url": "/" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Liveness check",
+        "operationId": "healthz",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/StatusOk" } } }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Readiness check",
+        "operationId": "readyz",
+        "security": [],
+        "responses": {
+          "200": { "description": "Service is ready" },
+          "503": { "description": "Service not ready" }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "summary": "Prometheus metrics",
+        "operationId": "metricsPrometheus",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Prometheus text format",
+            "content": { "text/plain": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/metrics/json": {
+      "get": {
+        "summary": "Metrics as JSON",
+        "operationId": "metricsJson",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Current metric counters",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Metrics" } } }
+          }
+        }
+      }
+    },
+    "/v1/upload": {
+      "post": {
+        "summary": "Upload a raw FIN message",
+        "operationId": "uploadFin",
+        "description": "Accepts a raw FIN body, stores it, and enqueues a processing job. Returns 202 with job_id immediately.",
+        "parameters": [
+          {
+            "name": "message_type",
+            "in": "query",
+            "description": "Override message type detection (e.g. MT540)",
+            "schema": { "type": "string", "example": "MT540" }
+          },
+          {
+            "name": "outputs",
+            "in": "query",
+            "description": "Comma-separated list of outputs: rendered, parquet, errors, zip",
+            "schema": { "type": "string", "example": "rendered,parquet" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+        },
+        "responses": {
+          "202": {
+            "description": "Job accepted",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubmitResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "413": { "$ref": "#/components/responses/PayloadTooLarge" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "summary": "Submit a batch prefix job",
+        "operationId": "submitJob",
+        "description": "Enqueues a job that processes all FIN files under an S3 prefix. Returns 202 with job_id immediately. The output_prefix field in the request body is ignored; the server derives it from the job_id.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobRequest" } } }
+        },
+        "responses": {
+          "202": {
+            "description": "Job accepted",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SubmitResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
+      "get": {
+        "summary": "List recent jobs",
+        "operationId": "listJobs",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Max results (default 50, max 500)",
+            "schema": { "type": "integer", "default": 50, "maximum": 500 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of recent job statuses",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/JobStatusView" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "get": {
+        "summary": "Poll job status",
+        "operationId": "getJobStatus",
+        "parameters": [
+          { "name": "job_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current job status",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobStatusView" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/manifest": {
+      "get": {
+        "summary": "Retrieve completed job manifest",
+        "operationId": "getManifest",
+        "parameters": [
+          { "name": "job_id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job manifest JSON",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JobManifest" } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/v1/object/{uri}": {
+      "get": {
+        "summary": "Download an artifact by object-store URI",
+        "operationId": "getObject",
+        "parameters": [
+          {
+            "name": "uri",
+            "in": "path",
+            "required": true,
+            "description": "Object URI starting with s3:// (URL-encoded)",
+            "schema": { "type": "string", "example": "s3://swiftpipe-outbox/jobs/abc/manifest.json" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Artifact bytes" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Set SWIFTPIPE_AUTH_TOKEN env var on the server to enable auth. Pass as Authorization: Bearer <token>."
+      }
+    },
+    "schemas": {
+      "StatusOk": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "example": "ok" } }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "error" },
+          "code": {
+            "type": "string",
+            "enum": [
+              "bad_request",
+              "not_found",
+              "payload_too_large",
+              "service_unavailable",
+              "gateway_timeout",
+              "rate_limited",
+              "unauthorized",
+              "internal_error"
+            ]
+          },
+          "error": { "type": "string" }
+        }
+      },
+      "Metrics": {
+        "type": "object",
+        "properties": {
+          "jobs_submitted": { "type": "integer" },
+          "jobs_completed": { "type": "integer" },
+          "jobs_failed": { "type": "integer" },
+          "jobs_in_flight": { "type": "integer" },
+          "queue_depth": { "type": "integer" }
+        }
+      },
+      "SubmitResponse": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "example": "queued" },
+          "poll_url": { "type": "string", "example": "/v1/jobs/abc123" }
+        }
+      },
+      "JobRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "input_uri": { "type": "string", "example": "s3://swiftpipe-inbox/daily/input.fin" },
+          "input_prefix": { "type": "string", "example": "s3://swiftpipe-inbox/daily/" },
+          "output_prefix": { "type": "string", "description": "Ignored by the API; output prefix is derived from the server-assigned job_id." },
+          "include_suffix": { "type": "string", "default": ".fin" },
+          "message_type": { "type": "string", "example": "MT540" },
+          "render_validate": { "type": "boolean", "default": true },
+          "outputs": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["rendered", "parquet", "errors", "zip"] }
+          }
+        }
+      },
+      "JobStatusView": {
+        "type": "object",
+        "properties": {
+          "job_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["queued", "running", "completed", "completed_with_errors", "failed"] },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" },
+          "error": { "type": "string", "nullable": true }
+        }
+      },
+      "JobManifest": {
+        "type": "object",
+        "properties": {
+          "contract_version": { "type": "string" },
+          "job_id": { "type": "string" },
+          "status": { "type": "string" },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "messages": { "type": "integer" },
+              "rendered": { "type": "integer" },
+              "errors": { "type": "integer" }
+            }
+          },
+          "outputs": { "type": "object" },
+          "timings": { "type": "object" }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "PayloadTooLarge": {
+        "description": "Payload too large",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      },
+      "ServiceUnavailable": {
+        "description": "Service unavailable (queue full)",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } }
+      }
+    }
+  }
+}

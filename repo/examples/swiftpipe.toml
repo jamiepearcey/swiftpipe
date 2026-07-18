@@ -1,0 +1,20 @@
+[source]
+adapter = "duckdb"
+database = "examples/swiftpipe.duckdb"
+table = "inbound_messages"
+id_column = "id"
+message_type_column = "message_type"
+body_column = "body"
+processed_column = "processed"
+
+[sink]
+adapter = "duckdb"
+database = "examples/swiftpipe.duckdb"
+write_batch_size = 1000
+
+[schemas]
+paths = ["examples/schemas"]
+
+[runtime]
+batch_size = 10000
+fail_on_missing_schema = false

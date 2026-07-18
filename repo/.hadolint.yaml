@@ -1,0 +1,4 @@
+ignored:
+  # Version pinning for apt packages is tracked separately from this lint-job
+  # enablement task; the image currently uses Debian security updates.
+  - DL3008

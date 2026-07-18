@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/jamiepearcey/swiftpipe/swiftpipe-api
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 2Gi
+
+env:
+  rustLog: swiftpipe_api=info,tower_http=warn
+  authRequired: false
+  authTokenSecretName: ""
+  corsOrigins: ""
+
+persistence:
+  enabled: false
+  objects:
+    size: 10Gi
+    storageClassName: ""
+  work:
+    size: 10Gi
+    storageClassName: ""

@@ -1,0 +1,46 @@
+[package]
+name = "swift-api"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+repository = "https://github.com/jamiepearcey/swiftpipe"
+
+[package.metadata.dist]
+dist = true
+
+[[bin]]
+name = "swiftpipe-api"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = { version = "0.7", features = ["macros"] }
+clap = { version = "4.5", features = ["derive"] }
+duckdb = { version = "1.10501.0", features = ["bundled"] }
+governor = "0.8"
+lru = "0.12"
+pin-project-lite = "0.2"
+prometheus = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "migrate"] }
+swift-core = { path = "../swift-core" }
+swift-db = { path = "../swift-db" }
+swift-duckdb = { path = "../swift-duckdb" }
+swift-schema = { path = "../swift-schema" }
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.4", features = ["timeout", "util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4"] }
+zip = "6"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3"
+
+[[bench]]
+name = "zip_export"
+harness = false

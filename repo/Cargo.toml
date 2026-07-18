@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "crates/swift-api",
+    "crates/swift-cli",
+    "crates/swift-core",
+    "crates/swift-db",
+    "crates/swift-duckdb",
+    "crates/swift-normalize",
+    "crates/swift-schema",
+]
+resolver = "2"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.32.0"
+ci = ["github"]
+installers = ["shell"]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-apple-darwin"]
+pr-run-mode = "plan"

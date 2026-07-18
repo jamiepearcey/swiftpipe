@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "swiftpipe.fullname" . }}
+  labels:
+    {{- include "swiftpipe.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "swiftpipe.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "swiftpipe.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: swiftpipe-api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: RUST_LOG
+              value: {{ .Values.env.rustLog | quote }}
+            - name: SWIFTPIPE_AUTH_REQUIRED
+              value: {{ ternary "1" "0" .Values.env.authRequired | quote }}
+            {{- if .Values.env.authTokenSecretName }}
+            - name: SWIFTPIPE_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.env.authTokenSecretName | quote }}
+                  key: token
+            {{- end }}
+            {{- if .Values.env.corsOrigins }}
+            - name: SWIFTPIPE_CORS_ORIGINS
+              value: {{ .Values.env.corsOrigins | quote }}
+            {{- end }}
+          args:
+            - --listen
+            - 0.0.0.0:8080
+            - --schema-path
+            - /app/schemas
+            - --object-root
+            - /data/objects
+            - --work-root
+            - /data/work
+            - --ui-dist
+            - /app/ui
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: objects
+              mountPath: /data/objects
+            - name: work
+              mountPath: /data/work
+      volumes:
+        - name: objects
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "swiftpipe.fullname" . }}-objects
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: work
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "swiftpipe.fullname" . }}-work
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

@@ -1,0 +1,19 @@
+[package]
+name = "swift-duckdb"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+duckdb = { version = "1.10501.0", features = ["bundled"] }
+swift-db = { path = "../swift-db" }
+swift-schema = { path = "../swift-schema" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+swift-core = { path = "../swift-core" }
+
+[[bench]]
+name = "write_batch"
+harness = false

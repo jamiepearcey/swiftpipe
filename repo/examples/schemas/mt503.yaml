@@ -1,0 +1,339 @@
+---
+field_types:
+- name: settlement_reference
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: rest
+    name: value
+- name: settlement_date
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: capture
+    name: date
+    value_type: digits
+    length: 8
+- name: settlement_datetime_text
+  pattern:
+  - kind: rest
+    name: value
+- name: settlement_quantity
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: rest
+    name: quantity
+- name: settlement_amount
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: rest
+    name: amount
+- name: settlement_qualified_code
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: rest
+    name: code
+- name: settlement_text
+  pattern:
+  - kind: rest
+    name: value
+messages:
+- message: MT503
+  category: securities
+  version: starter
+  coverage:
+    source: starter schema derived from common settlement instruction structure; not
+      licensed SRU import
+    exact: false
+    expected_sequences: 9
+    expected_fields: 19
+    notes:
+    - Models common GENL, TRADDET, FIAC, SETDET, SETPRTY, and amount/date/reference
+      fields.
+    - Exact reproduction requires licensed SWIFT/ISO source import and full network
+      validation rules.
+  sequences:
+    GENL: {}
+    LINK:
+      parents:
+      - GENL
+      - TRADDET
+      repeat: true
+    TRADDET:
+      repeat: true
+    FIAC:
+      parent: TRADDET
+      repeat: true
+    SETDET:
+      repeat: true
+    SETPRTY:
+      parent: SETDET
+      repeat: true
+    CSHPRTY:
+      parent: SETDET
+      repeat: true
+    AMT:
+      parent: SETDET
+      repeat: true
+    OTHRPRTY:
+      parent: SETDET
+      repeat: true
+  fields:
+  - path: GENL
+    tag: 20C
+    qualifier: SEME
+    name: sender_reference
+    type: settlement_reference
+    required: true
+    min: 1
+    max: 1
+    entity: settlement_instruction
+    column: sender_reference
+  - path: GENL
+    tag: 23G
+    name: function
+    type: settlement_text
+    required: true
+    min: 1
+    max: 1
+    entity: settlement_instruction
+    column: function
+  - path: GENL
+    tag: 98a
+    options:
+    - A
+    - C
+    - E
+    name: preparation_date
+    type: settlement_datetime_text
+    option_types:
+      A: settlement_date
+      C: settlement_datetime_text
+      E: settlement_datetime_text
+    entity: settlement_instruction
+    column: preparation_date
+    render:
+      option: A
+      qualifier: PREP
+  - path: GENL
+    tag: 16R
+    name: sequence_marker
+    type: settlement_text
+    entity: settlement_audit
+    column: marker
+  - path: GENL/LINK
+    tag: 20C
+    name: linked_reference
+    type: settlement_reference
+    entity: settlement_link
+    column: linked_reference
+    render:
+      qualifier: RELA
+  - path: TRADDET
+    tag: 98a
+    options:
+    - A
+    - B
+    - C
+    - E
+    qualifier: TRAD
+    name: trade_date
+    type: settlement_datetime_text
+    option_types:
+      A: settlement_date
+      B: settlement_datetime_text
+      C: settlement_datetime_text
+      E: settlement_datetime_text
+    entity: settlement_trade
+    column: trade_date
+    render:
+      option: A
+      qualifier: TRAD
+  - path: TRADDET
+    tag: 98a
+    options:
+    - A
+    - B
+    - C
+    - E
+    qualifier: SETT
+    name: settlement_date
+    type: settlement_datetime_text
+    option_types:
+      A: settlement_date
+      B: settlement_datetime_text
+      C: settlement_datetime_text
+      E: settlement_datetime_text
+    required: true
+    min: 1
+    entity: settlement_trade
+    column: settlement_date
+    render:
+      option: A
+      qualifier: SETT
+  - path: TRADDET
+    tag: 35B
+    name: financial_instrument
+    type: settlement_text
+    required: true
+    min: 1
+    max: 1
+    entity: settlement_trade
+    column: instrument
+  - path: TRADDET
+    tag: 22F
+    name: trade_indicator
+    type: settlement_qualified_code
+    entity: settlement_trade_indicator
+    column: indicator
+    render:
+      qualifier: STCO
+  - path: TRADDET/LINK
+    tag: 20C
+    name: trade_linked_reference
+    type: settlement_reference
+    entity: settlement_trade_link
+    column: linked_reference
+    render:
+      qualifier: RELA
+  - path: TRADDET/FIAC
+    tag: 36B
+    name: settlement_quantity
+    type: settlement_quantity
+    required: true
+    min: 1
+    entity: settlement_quantity
+    column: quantity
+    render:
+      qualifier: SETT
+  - path: TRADDET/FIAC
+    tag: 97a
+    options:
+    - A
+    - B
+    - D
+    name: safekeeping_account
+    type: settlement_reference
+    entity: settlement_account
+    column: safekeeping_account
+    render:
+      option: A
+      qualifier: SAFE
+  - path: SETDET
+    tag: 22F
+    name: settlement_indicator
+    type: settlement_qualified_code
+    entity: settlement_indicator
+    column: indicator
+    render:
+      qualifier: STCO
+  - path: SETDET
+    tag: 22H
+    name: settlement_method
+    type: settlement_qualified_code
+    entity: settlement_indicator
+    column: method
+    render:
+      qualifier: REDE
+  - path: SETDET/SETPRTY
+    tag: 95a
+    options:
+    - C
+    - D
+    - L
+    - P
+    - Q
+    - R
+    name: settlement_party
+    type: settlement_qualified_code
+    entity: settlement_party
+    column: party
+    render:
+      option: P
+      qualifier: PSET
+  - path: SETDET/SETPRTY
+    tag: 97a
+    options:
+    - A
+    - B
+    - D
+    name: settlement_party_account
+    type: settlement_reference
+    entity: settlement_party
+    column: account
+    render:
+      option: A
+      qualifier: SAFE
+  - path: SETDET/CSHPRTY
+    tag: 95a
+    options:
+    - C
+    - D
+    - L
+    - P
+    - Q
+    - R
+    name: cash_party
+    type: settlement_qualified_code
+    entity: settlement_cash_party
+    column: party
+    render:
+      option: P
+      qualifier: PSET
+  - path: SETDET/AMT
+    tag: 19A
+    name: settlement_amount
+    type: settlement_amount
+    entity: settlement_amount
+    column: amount
+    render:
+      qualifier: SETT
+  - path: SETDET/OTHRPRTY
+    tag: 95a
+    options:
+    - C
+    - D
+    - L
+    - P
+    - Q
+    - R
+    name: other_party
+    type: settlement_qualified_code
+    entity: settlement_other_party
+    column: party
+    render:
+      option: P
+      qualifier: PSET

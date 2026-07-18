@@ -1,0 +1,463 @@
+# MT537 starter schema.
+#
+# Source basis: public ISO 15022 MT537 format overview, accessed 2026-05-11:
+# https://www.iso20022.org/15022/uhb/finmt537.htm
+#
+# This is not yet a certified/exact SRU reproduction. It covers the primary
+# General Information, Status, Transaction, Transaction Details, Settlement
+# Party, and Penalty paths that the current schema engine can express.
+field_types:
+  - name: mt537_reference
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: value
+  - name: mt537_date
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: capture
+        name: date
+        value_type: digits
+        length: 8
+  - name: mt537_datetime_text
+    pattern:
+      - kind: rest
+        name: value
+  - name: mt537_amount
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: amount
+  - name: mt537_quantity
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: quantity
+  - name: mt537_qualified_code
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "//"
+      - kind: rest
+        name: code
+  - name: mt537_qualified_status
+    pattern:
+      - kind: literal
+        value: ":"
+      - kind: capture
+        name: qualifier
+        value_type: alpha_num
+        length: 4
+      - kind: literal
+        value: "/"
+      - kind: rest
+        name: code
+  - name: mt537_text
+    pattern:
+      - kind: rest
+        name: value
+messages:
+  - message: MT537
+    category: securities
+    version: "starter"
+    coverage:
+      source: "public ISO 15022 MT537 overview, not licensed SRU import"
+      exact: false
+      expected_sequences: 12
+      expected_fields: 35
+      notes:
+        - "Baseline tracks implemented starter schema count, not complete official SRU count."
+        - "Exact reproduction requires licensed SWIFT/ISO source import and option/rule verification."
+    sequences:
+      GENL: {}
+      LINK:
+        parents: [GENL, TRAN, TRANS]
+        repeat: true
+      STAT:
+        repeat: true
+      REAS:
+        parent: STAT
+        repeat: true
+      TRAN:
+        parent: STAT
+        repeat: true
+      TRANS:
+        repeat: true
+      TRANSDET:
+        parents: [TRAN, TRANS]
+        repeat: true
+      SETPRTY:
+        parent: TRANSDET
+        repeat: true
+      PENA:
+        repeat: true
+      PENACUR:
+        parent: PENA
+        repeat: true
+      PENACOUNT:
+        parent: PENACUR
+        repeat: true
+      PENDET:
+        parent: PENACOUNT
+        repeat: true
+    fields:
+      - path: GENL
+        tag: 20C
+        qualifier: SEME
+        name: sender_reference
+        type: mt537_reference
+        required: true
+        min: 1
+        max: 1
+        entity: mt537_statement
+        column: sender_reference
+      - path: GENL
+        tag: 23G
+        name: function
+        type: mt537_text
+        required: true
+        min: 1
+        max: 1
+        entity: mt537_statement
+        column: function
+      - path: GENL
+        tag: 28E
+        name: page_number
+        type: mt537_text
+        required: true
+        min: 1
+        max: 1
+        entity: mt537_statement
+        column: page_number
+      - path: GENL
+        tag: 98a
+        options: [A, C, E]
+        name: statement_date
+        type: mt537_datetime_text
+        option_types:
+          A: mt537_date
+          C: mt537_datetime_text
+          E: mt537_datetime_text
+        entity: mt537_statement
+        column: statement_date
+        render:
+          option: A
+          qualifier: STAT
+      - path: GENL
+        tag: 22a
+        options: [F, H]
+        name: statement_indicator
+        type: mt537_qualified_code
+        entity: mt537_statement_indicator
+        column: indicator
+        render:
+          option: F
+          qualifier: SFRE
+      - path: GENL
+        tag: 95a
+        options: [L, P, R]
+        name: account_owner_bic
+        type: mt537_qualified_code
+        entity: mt537_party
+        column: party
+        render:
+          option: P
+          qualifier: PSET
+      - path: GENL
+        tag: 97a
+        options: [A, B, D]
+        name: safekeeping_account
+        type: mt537_reference
+        entity: mt537_account
+        column: account
+        render:
+          option: A
+          qualifier: SAFE
+      - path: GENL
+        tag: 17B
+        qualifier: ACTI
+        name: activity_flag
+        type: mt537_qualified_code
+        min: 1
+        max: 1
+        entity: mt537_statement
+        column: activity_flag
+      - path: GENL/LINK
+        tag: 20C
+        name: linked_reference
+        type: mt537_reference
+        entity: mt537_link
+        column: linked_reference
+        render:
+          qualifier: RELA
+      - path: STAT
+        tag: 25D
+        name: status_code
+        type: mt537_qualified_status
+        required: true
+        min: 1
+        entity: mt537_status
+        column: status_code
+        render:
+          qualifier: IPRC
+      - path: STAT/REAS
+        tag: 24B
+        name: reason_code
+        type: mt537_qualified_status
+        entity: mt537_reason
+        column: reason_code
+        render:
+          qualifier: REAS
+      - path: STAT/REAS
+        tag: 70D
+        qualifier: REAS
+        name: reason_narrative
+        type: mt537_reference
+        entity: mt537_reason
+        column: narrative
+      - path: STAT/TRAN/LINK
+        tag: 20a
+        options: [C, U]
+        name: transaction_link_reference
+        type: mt537_reference
+        entity: mt537_transaction_link
+        column: linked_reference
+        render:
+          option: C
+          qualifier: RELA
+      - path: STAT/TRAN/TRANSDET
+        tag: 35B
+        name: financial_instrument
+        type: mt537_text
+        required: true
+        min: 1
+        max: 1
+        entity: mt537_transaction
+        column: instrument
+      - path: STAT/TRAN/TRANSDET
+        tag: 36a
+        options: [B, D]
+        name: posting_quantity
+        type: mt537_quantity
+        required: true
+        min: 1
+        max: 1
+        entity: mt537_transaction
+        column: quantity
+        render:
+          option: B
+          qualifier: PSTA
+      - path: STAT/TRAN/TRANSDET
+        tag: 19A
+        name: posting_amount
+        type: mt537_amount
+        entity: mt537_transaction
+        column: amount
+        render:
+          qualifier: PSTA
+      - path: STAT/TRAN/TRANSDET
+        tag: 22a
+        options: [F, H]
+        name: transaction_indicator
+        type: mt537_qualified_code
+        required: true
+        min: 1
+        entity: mt537_transaction_indicator
+        column: indicator
+        render:
+          option: H
+          qualifier: REDE
+      - path: STAT/TRAN/TRANSDET
+        tag: 98a
+        options: [A, B, C, E]
+        name: transaction_date
+        type: mt537_datetime_text
+        option_types:
+          A: mt537_date
+          B: mt537_datetime_text
+          C: mt537_datetime_text
+          E: mt537_datetime_text
+        required: true
+        min: 1
+        entity: mt537_transaction_date
+        column: date
+        render:
+          option: A
+          qualifier: SETT
+      - path: STAT/TRAN/TRANSDET
+        tag: 70E
+        qualifier: TRDE
+        name: transaction_narrative
+        type: mt537_reference
+        entity: mt537_transaction
+        column: narrative
+      - path: STAT/TRAN/TRANSDET/SETPRTY
+        tag: 95a
+        options: [C, D, L, P, Q, R]
+        name: settlement_party
+        type: mt537_qualified_code
+        entity: mt537_settlement_party
+        column: party
+        render:
+          option: P
+          qualifier: PSET
+      - path: STAT/TRAN/TRANSDET/SETPRTY
+        tag: 97a
+        options: [A, B, D]
+        name: settlement_party_account
+        type: mt537_reference
+        entity: mt537_settlement_party
+        column: account
+        render:
+          option: A
+          qualifier: SAFE
+      - path: STAT/TRAN/TRANSDET/SETPRTY
+        tag: 20C
+        qualifier: PROC
+        name: processing_reference
+        type: mt537_reference
+        entity: mt537_settlement_party
+        column: processing_reference
+      - path: TRANS/LINK
+        tag: 20a
+        options: [C, U]
+        name: transaction_sequence_link_reference
+        type: mt537_reference
+        entity: mt537_transaction_link
+        column: linked_reference
+        render:
+          option: C
+          qualifier: RELA
+      - path: TRANS/TRANSDET
+        tag: 35B
+        name: transaction_sequence_instrument
+        type: mt537_text
+        entity: mt537_transaction
+        column: instrument
+      - path: TRANS/TRANSDET
+        tag: 36a
+        options: [B, D]
+        name: transaction_sequence_quantity
+        type: mt537_quantity
+        entity: mt537_transaction
+        column: quantity
+        render:
+          option: B
+          qualifier: PSTA
+      - path: TRANS/TRANSDET
+        tag: 19A
+        name: transaction_sequence_amount
+        type: mt537_amount
+        entity: mt537_transaction
+        column: amount
+        render:
+          qualifier: PSTA
+      - path: TRANS/TRANSDET
+        tag: 98a
+        options: [A, B, C, E]
+        name: transaction_sequence_date
+        type: mt537_datetime_text
+        option_types:
+          A: mt537_date
+          B: mt537_datetime_text
+          C: mt537_datetime_text
+          E: mt537_datetime_text
+        entity: mt537_transaction_date
+        column: date
+        render:
+          option: A
+          qualifier: SETT
+      - path: PENA
+        tag: 22F
+        qualifier: CODE
+        name: penalty_list_type
+        type: mt537_qualified_status
+        entity: mt537_penalty_statement
+        column: penalty_list_type
+      - path: PENA/PENACUR
+        tag: 11A
+        qualifier: PECU
+        name: penalty_currency
+        type: mt537_reference
+        entity: mt537_penalty_currency
+        column: currency
+      - path: PENA/PENACUR
+        tag: 20C
+        qualifier: CPRF
+        name: cash_penalty_reference
+        type: mt537_reference
+        entity: mt537_penalty_currency
+        column: cash_penalty_reference
+      - path: PENA/PENACUR
+        tag: 19A
+        name: penalty_amount
+        type: mt537_amount
+        entity: mt537_penalty_currency
+        column: amount
+        render:
+          qualifier: AMCO
+      - path: PENA/PENACUR/PENACOUNT
+        tag: 95a
+        options: [L, P, Q, R]
+        name: penalty_counterparty
+        type: mt537_qualified_code
+        entity: mt537_penalty_counterparty
+        column: party
+        render:
+          option: P
+          qualifier: PSET
+      - path: PENA/PENACUR/PENACOUNT
+        tag: 19A
+        qualifier: AGNT
+        name: bilateral_net_amount
+        type: mt537_amount
+        entity: mt537_penalty_counterparty
+        column: bilateral_net_amount
+      - path: PENA/PENACUR/PENACOUNT/PENDET
+        tag: 20C
+        name: penalty_detail_reference
+        type: mt537_reference
+        entity: mt537_penalty_detail
+        column: reference
+        render:
+          qualifier: CPRE
+      - path: PENA/PENACUR/PENACOUNT/PENDET
+        tag: 19A
+        qualifier: AMCO
+        name: amount_computed
+        type: mt537_amount
+        entity: mt537_penalty_detail
+        column: amount_computed

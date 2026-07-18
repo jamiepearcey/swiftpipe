@@ -1,0 +1,19 @@
+[source]
+adapter = "duckdb"
+database = "examples/all5.duckdb"
+table = "inbound_messages"
+id_column = "id"
+message_type_column = "message_type"
+body_column = "body"
+processed_column = "processed"
+
+[sink]
+adapter = "duckdb"
+database = "examples/all5.duckdb"
+
+[schemas]
+paths = ["examples/schemas"]
+
+[runtime]
+batch_size = 10000
+fail_on_missing_schema = true

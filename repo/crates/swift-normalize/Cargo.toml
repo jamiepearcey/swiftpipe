@@ -1,0 +1,14 @@
+[package]
+name = "swift-normalize"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+swift-db = { path = "../swift-db" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+swift-core = { path = "../swift-core" }
+swift-schema = { path = "../swift-schema" }
