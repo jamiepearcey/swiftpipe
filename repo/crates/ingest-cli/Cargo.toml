@@ -1,0 +1,23 @@
+[package]
+name = "ingest-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[[bin]]
+name = "ingest"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+ingest-core = { path = "../ingest-core" }
+ingest-parquet = { path = "../ingest-parquet" }
+ingest-pnl = { path = "../ingest-pnl" }
+ingest-tabular = { path = "../ingest-tabular" }
+swift-core = { path = "../swift-core" }
+swift-db = { path = "../swift-db" }
+swift-schema = { path = "../swift-schema" }
+swift-normalize = { path = "../swift-normalize" }
+swift-mt940 = { path = "../swift-mt940" }
+mx-camt = { path = "../mx-camt" }

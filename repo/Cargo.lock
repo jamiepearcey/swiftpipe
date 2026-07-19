@@ -1883,6 +1883,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingest-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ingest-core",
+ "ingest-parquet",
+ "ingest-pnl",
+ "ingest-tabular",
+ "mx-camt",
+ "swift-core",
+ "swift-db",
+ "swift-mt940",
+ "swift-normalize",
+ "swift-schema",
+]
+
+[[package]]
 name = "ingest-core"
 version = "0.1.0"
 dependencies = [
