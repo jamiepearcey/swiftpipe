@@ -1,0 +1,13 @@
+[package]
+name = "ingest-pnl"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+ingest-core = { path = "../ingest-core" }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+swift-mt940 = { path = "../swift-mt940" }

@@ -1901,6 +1901,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingest-pnl"
+version = "0.1.0"
+dependencies = [
+ "ingest-core",
+ "serde",
+ "swift-mt940",
+]
+
+[[package]]
 name = "ingest-tabular"
 version = "0.1.0"
 dependencies = [
