@@ -1,0 +1,15 @@
+[package]
+name = "ingest-parquet"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+
+[dependencies]
+ingest-core = { path = "../ingest-core" }
+arrow = "55"
+parquet = "55"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"

@@ -3,6 +3,7 @@ members = [
     "crates/swift-api",
     "crates/swift-cli",
     "crates/ingest-core",
+    "crates/ingest-parquet",
     "crates/ingest-tabular",
     "crates/mx-camt",
     "crates/swift-core",

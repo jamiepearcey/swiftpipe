@@ -28,6 +28,17 @@ pub enum EventKind {
     Other,
 }
 
+impl EventKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EventKind::Holding => "holding",
+            EventKind::Settlement => "settlement",
+            EventKind::TradeConfirm => "trade_confirm",
+            EventKind::Other => "other",
+        }
+    }
+}
+
 /// A normalized securities event — the platform's read of one custodian/OMS
 /// record, independent of the wire format it arrived in.
 #[derive(Debug, Clone, PartialEq, Default, Serialize)]
@@ -84,6 +95,15 @@ impl Direction {
         match self {
             Direction::Credit | Direction::ReversalDebit => 1.0,
             Direction::Debit | Direction::ReversalCredit => -1.0,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Direction::Credit => "credit",
+            Direction::Debit => "debit",
+            Direction::ReversalCredit => "reversal_credit",
+            Direction::ReversalDebit => "reversal_debit",
         }
     }
 }
