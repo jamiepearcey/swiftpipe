@@ -1892,6 +1892,8 @@ dependencies = [
  "ingest-pnl",
  "ingest-tabular",
  "mx-camt",
+ "serde",
+ "serde_json",
  "swift-core",
  "swift-db",
  "swift-mt940",

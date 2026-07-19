@@ -10,9 +10,13 @@
 //!                [--schema-dir DIR] [--out-dir DIR]
 //! ```
 
+mod snapshot;
+
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
+
+use ingest_core::{CashStatement, SecurityEvent};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Route {
@@ -23,6 +27,12 @@ enum Route {
 }
 
 fn main() -> Result<()> {
+    // Subcommand dispatch: `ingest snapshot <files...>` builds the UI recon
+    // snapshot; bare `ingest <input>` runs the single-file wedge as before.
+    if std::env::args().nth(1).as_deref() == Some("snapshot") {
+        return run_snapshot();
+    }
+
     let mut input: Option<PathBuf> = None;
     let mut out_dir = PathBuf::from(".");
     let mut schema_dir = PathBuf::from("examples/schemas");
@@ -65,12 +75,27 @@ fn main() -> Result<()> {
     }
 }
 
-fn run_cash(route: Route, content: &str, out_dir: &Path) -> Result<()> {
-    let statements = match route {
-        Route::CashMt940 => swift_mt940::parse_mt940(content, "cli").into_iter().collect::<Vec<_>>(),
+/// Parse one cash input (MT940 / camt.053) into normalized statements.
+fn parse_cash(route: Route, content: &str) -> Vec<CashStatement> {
+    match route {
+        // Empty id → the parser adopts the statement's own `:20:` reference.
+        Route::CashMt940 => swift_mt940::parse_mt940(content, "").into_iter().collect(),
         Route::CashCamt => mx_camt::parse_camt053(content, ""),
         _ => unreachable!(),
-    };
+    }
+}
+
+/// Parse one positions input (custodian CSV / MT securities) into events.
+fn parse_positions(route: Route, content: &str, schema_dir: &Path) -> Result<Vec<SecurityEvent>> {
+    Ok(match route {
+        Route::PositionsCsv => ingest_tabular::parse_csv(content),
+        Route::PositionsMt => parse_mt_securities(content, schema_dir)?,
+        _ => unreachable!(),
+    })
+}
+
+fn run_cash(route: Route, content: &str, out_dir: &Path) -> Result<()> {
+    let statements = parse_cash(route, content);
     if statements.is_empty() {
         bail!("no cash statements parsed from the input");
     }
@@ -95,11 +120,7 @@ fn run_cash(route: Route, content: &str, out_dir: &Path) -> Result<()> {
 }
 
 fn run_positions(route: Route, content: &str, schema_dir: &Path, out_dir: &Path) -> Result<()> {
-    let events = match route {
-        Route::PositionsCsv => ingest_tabular::parse_csv(content),
-        Route::PositionsMt => parse_mt_securities(content, schema_dir)?,
-        _ => unreachable!(),
-    };
+    let events = parse_positions(route, content, schema_dir)?;
     if events.is_empty() {
         bail!("no securities events parsed from the input");
     }
@@ -116,6 +137,51 @@ fn run_positions(route: Route, content: &str, schema_dir: &Path, out_dir: &Path)
     for (isin, qty) in &summary.by_isin {
         println!("  {isin:<14} {qty:>14.2}");
     }
+    println!("→ wrote {}", out.display());
+    Ok(())
+}
+
+/// `ingest snapshot <files...> [--out FILE] [--schema-dir DIR]` — ingest any
+/// mix of cash + positions inputs and emit one combined `recon-snapshot.json`
+/// in the UI contract (the presentation-plane seam for the Reconciliation desk).
+fn run_snapshot() -> Result<()> {
+    let mut inputs: Vec<PathBuf> = Vec::new();
+    let mut out = PathBuf::from("recon-snapshot.json");
+    let mut schema_dir = PathBuf::from("examples/schemas");
+
+    let mut args = std::env::args().skip(2); // skip argv0 + "snapshot"
+    while let Some(a) = args.next() {
+        match a.as_str() {
+            "--out" => out = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--out needs a value"))?,
+            "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
+            "-h" | "--help" => {
+                eprintln!("usage: ingest snapshot <files...> [--out recon-snapshot.json] [--schema-dir DIR]");
+                return Ok(());
+            }
+            other => inputs.push(PathBuf::from(other)),
+        }
+    }
+    if inputs.is_empty() {
+        bail!("snapshot: no input files (see --help)");
+    }
+
+    let mut statements: Vec<CashStatement> = Vec::new();
+    let mut events: Vec<SecurityEvent> = Vec::new();
+    for path in &inputs {
+        let content = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let route = detect(path, &content).with_context(|| format!("detecting type of {}", path.display()))?;
+        match route {
+            Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
+            Route::PositionsCsv | Route::PositionsMt => events.extend(parse_positions(route, &content, &schema_dir)?),
+        }
+    }
+
+    let snap = snapshot::ReconSnapshot::build(&statements, &events);
+    let json = serde_json::to_string_pretty(&snap)?;
+    std::fs::write(&out, &json).with_context(|| format!("writing {}", out.display()))?;
+
+    println!("statements : {}", snap.statements.len());
+    println!("positions  : {}", snap.positions.len());
     println!("→ wrote {}", out.display());
     Ok(())
 }
