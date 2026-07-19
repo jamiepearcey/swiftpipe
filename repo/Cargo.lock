@@ -1887,6 +1887,8 @@ name = "ingest-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
+ "duckdb",
  "ingest-core",
  "ingest-parquet",
  "ingest-pnl",
@@ -1899,6 +1901,8 @@ dependencies = [
  "swift-mt940",
  "swift-normalize",
  "swift-schema",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

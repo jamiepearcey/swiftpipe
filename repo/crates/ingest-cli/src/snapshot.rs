@@ -73,6 +73,12 @@ impl ReconSnapshot {
             positions: events.iter().filter_map(map_position).collect(),
         }
     }
+
+    /// Assemble from already-flattened parts — the read-model service builds
+    /// these straight from a DuckDB query over the Parquet store.
+    pub fn from_parts(statements: Vec<SnapshotStatement>, positions: Vec<SnapshotPosition>) -> Self {
+        ReconSnapshot { version: Self::VERSION, statements, positions }
+    }
 }
 
 fn map_statement(s: &CashStatement) -> SnapshotStatement {

@@ -48,6 +48,33 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
     RecordBatch::try_new(schema, cols)
 }
 
+/// Build an Arrow RecordBatch of cash statement **headers** — one row per
+/// statement, carrying the balances the recon identity needs (opening + Σ
+/// movements == closing). Signed to the balance's effect (credit +, debit −);
+/// null when a balance is absent. Pair with [`cash_entries_batch`] (the lines)
+/// joined on `(source, message_id)`: header + fact is the read-model star.
+pub fn cash_statements_batch(statements: &[CashStatement]) -> Result<RecordBatch, ArrowError> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("source", DataType::Utf8, false),
+        Field::new("message_id", DataType::Utf8, false),
+        Field::new("message_type", DataType::Utf8, false),
+        Field::new("account", DataType::Utf8, true),
+        Field::new("currency", DataType::Utf8, true),
+        Field::new("opening", DataType::Float64, true),
+        Field::new("closing", DataType::Float64, true),
+    ]));
+    let cols: Vec<ArrayRef> = vec![
+        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.source.as_str()))),
+        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.message_id.as_str()))),
+        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.message_type.as_str()))),
+        Arc::new(StringArray::from_iter(statements.iter().map(|s| s.account.clone()))),
+        Arc::new(StringArray::from_iter(statements.iter().map(|s| s.currency.clone()))),
+        Arc::new(Float64Array::from_iter(statements.iter().map(|s| s.opening_balance.as_ref().map(|b| b.signed())))),
+        Arc::new(Float64Array::from_iter(statements.iter().map(|s| s.closing_balance.as_ref().map(|b| b.signed())))),
+    ];
+    RecordBatch::try_new(schema, cols)
+}
+
 /// Build an Arrow RecordBatch of cash entries — one row per entry, carrying its
 /// statement context (account/currency). This is the P&L/recon-ready shape:
 /// sum `signed_amount` for net movement, group by `transaction_type` for income.
@@ -107,6 +134,11 @@ pub fn write_security_events(events: &[SecurityEvent], path: &Path) -> anyhow::R
 /// Convenience: cash statements → Parquet file (one row per entry).
 pub fn write_cash_entries(statements: &[CashStatement], path: &Path) -> anyhow::Result<()> {
     write_parquet(&cash_entries_batch(statements)?, path)
+}
+
+/// Convenience: cash statement headers → Parquet file (one row per statement).
+pub fn write_cash_statements(statements: &[CashStatement], path: &Path) -> anyhow::Result<()> {
+    write_parquet(&cash_statements_batch(statements)?, path)
 }
 
 #[cfg(test)]
@@ -181,5 +213,27 @@ mod tests {
         let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         assert_eq!(rows, 2, "one row per cash entry");
         assert_eq!(batches[0].num_columns(), 13);
+    }
+
+    #[test]
+    fn cash_statement_headers_persist_balances() {
+        let stmt = CashStatement {
+            source: "swift".into(),
+            message_id: "s1".into(),
+            message_type: "MT940".into(),
+            account: Some("GB29...".into()),
+            currency: Some("EUR".into()),
+            opening_balance: Some(Balance { direction: Direction::Credit, amount: 100000.0, ..Default::default() }),
+            closing_balance: Some(Balance { direction: Direction::Credit, amount: 120000.0, ..Default::default() }),
+            ..Default::default()
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cash_statements.parquet");
+        write_cash_statements(std::slice::from_ref(&stmt), &path).unwrap();
+
+        let batches = read_rows(&path);
+        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        assert_eq!(rows, 1, "one row per statement header");
+        assert_eq!(batches[0].num_columns(), 7);
     }
 }

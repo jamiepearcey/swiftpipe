@@ -10,8 +10,10 @@
 //!                [--schema-dir DIR] [--out-dir DIR]
 //! ```
 
+mod serve;
 mod snapshot;
 
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -27,10 +29,16 @@ enum Route {
 }
 
 fn main() -> Result<()> {
-    // Subcommand dispatch: `ingest snapshot <files...>` builds the UI recon
-    // snapshot; bare `ingest <input>` runs the single-file wedge as before.
-    if std::env::args().nth(1).as_deref() == Some("snapshot") {
-        return run_snapshot();
+    // Subcommand dispatch. Bare `ingest <input>` runs the single-file wedge as
+    // before; the named subcommands build the read model + serve it:
+    //   snapshot  → static recon-snapshot.json (UI offline fallback)
+    //   store     → materialise the Parquet read-model store (write side)
+    //   serve     → query the store via DuckDB over HTTP (read side)
+    match std::env::args().nth(1).as_deref() {
+        Some("snapshot") => return run_snapshot(),
+        Some("store") => return run_store(),
+        Some("serve") => return run_serve_cmd(),
+        _ => {}
     }
 
     let mut input: Option<PathBuf> = None;
@@ -184,6 +192,77 @@ fn run_snapshot() -> Result<()> {
     println!("positions  : {}", snap.positions.len());
     println!("→ wrote {}", out.display());
     Ok(())
+}
+
+/// `ingest store <files...> [--store DIR] [--schema-dir DIR]` — the write side
+/// of the read model: ingest a mix of cash + positions inputs and materialise
+/// them as the Parquet store `serve` queries (statement headers + entry lines +
+/// positions). Overwrites the store's canonical set.
+fn run_store() -> Result<()> {
+    let mut inputs: Vec<PathBuf> = Vec::new();
+    let mut store = PathBuf::from("recon-store");
+    let mut schema_dir = PathBuf::from("examples/schemas");
+
+    let mut args = std::env::args().skip(2);
+    while let Some(a) = args.next() {
+        match a.as_str() {
+            "--store" => store = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--store needs a value"))?,
+            "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
+            "-h" | "--help" => {
+                eprintln!("usage: ingest store <files...> [--store recon-store] [--schema-dir DIR]");
+                return Ok(());
+            }
+            other => inputs.push(PathBuf::from(other)),
+        }
+    }
+    if inputs.is_empty() {
+        bail!("store: no input files (see --help)");
+    }
+
+    let mut statements: Vec<CashStatement> = Vec::new();
+    let mut events: Vec<SecurityEvent> = Vec::new();
+    for path in &inputs {
+        let content = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let route = detect(path, &content).with_context(|| format!("detecting type of {}", path.display()))?;
+        match route {
+            Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
+            Route::PositionsCsv | Route::PositionsMt => events.extend(parse_positions(route, &content, &schema_dir)?),
+        }
+    }
+
+    std::fs::create_dir_all(&store).with_context(|| format!("creating store {}", store.display()))?;
+    ingest_parquet::write_cash_statements(&statements, &store.join("cash_statements.parquet"))?;
+    ingest_parquet::write_cash_entries(&statements, &store.join("cash_entries.parquet"))?;
+    ingest_parquet::write_security_events(&events, &store.join("positions.parquet"))?;
+
+    println!("statements : {}", statements.len());
+    println!("entries    : {}", statements.iter().map(|s| s.entries.len()).sum::<usize>());
+    println!("positions  : {}", events.iter().filter(|e| e.isin.is_some()).count());
+    println!("→ store {}", store.display());
+    Ok(())
+}
+
+/// `ingest serve [--store DIR] [--bind ADDR]` — the read side: serve
+/// `GET /recon/snapshot` by querying the Parquet store via DuckDB.
+fn run_serve_cmd() -> Result<()> {
+    let mut store = PathBuf::from("recon-store");
+    let mut bind: SocketAddr = "127.0.0.1:7390".parse().unwrap();
+
+    let mut args = std::env::args().skip(2);
+    while let Some(a) = args.next() {
+        match a.as_str() {
+            "--store" => store = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--store needs a value"))?,
+            "--bind" => {
+                bind = args.next().ok_or_else(|| anyhow!("--bind needs a value"))?.parse().context("parsing --bind address")?;
+            }
+            "-h" | "--help" => {
+                eprintln!("usage: ingest serve [--store recon-store] [--bind 127.0.0.1:7390]");
+                return Ok(());
+            }
+            other => bail!("unexpected argument: {other}"),
+        }
+    }
+    serve::run_serve(store, bind)
 }
 
 fn parse_mt_securities(content: &str, schema_dir: &Path) -> Result<Vec<ingest_core::SecurityEvent>> {
