@@ -202,6 +202,36 @@ pub struct SequenceSchema {
     pub min: Option<u16>,
     #[serde(default)]
     pub max: Option<u16>,
+    /// Marks this as an **anchored** sequence: a repeating field group with NO
+    /// `:16R:`/`:16S:` wrapper in the wire format (e.g. MT940's Statement Line
+    /// group — tag `61` starts a new occurrence, `86` belongs to it). Root
+    /// scope only; mutually exclusive with `parent`/`parents`. See
+    /// `swift_core::AnchoredSequence`.
+    #[serde(default)]
+    pub anchor_tag: Option<String>,
+    /// Tags other than `anchor_tag` that belong to the current occurrence
+    /// (e.g. `["86"]`). Only meaningful when `anchor_tag` is set.
+    #[serde(default)]
+    pub member_tags: Vec<String>,
+}
+
+/// Extract the schema-declared anchored sequences (see [`SequenceSchema::anchor_tag`])
+/// as `swift_core::AnchoredSequence`s, ready to pass to
+/// `swift_core::parse_message_with_sequences`. Empty for schemas that only use
+/// `:16R:`/`:16S:` sequences (i.e. every schema before MT940).
+pub fn anchored_sequences(schema: &MessageSchema) -> Vec<swift_core::AnchoredSequence<'_>> {
+    schema
+        .sequences
+        .iter()
+        .filter_map(|(name, seq)| {
+            let anchor_tag = seq.anchor_tag.as_deref()?;
+            Some(swift_core::AnchoredSequence {
+                name: name.as_bytes(),
+                anchor_tag: anchor_tag.as_bytes(),
+                member_tags: seq.member_tags.iter().map(String::as_bytes).collect(),
+            })
+        })
+        .collect()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -1428,7 +1458,7 @@ pub fn render_message(
         }
     })?;
     let fields = render_block4_fields(catalog, schema, request)?;
-    let block4 = render_block4(&fields);
+    let block4 = render_block4(schema, &fields);
 
     let mut output = String::new();
     push_fmt(
@@ -1680,7 +1710,20 @@ fn render_field_order_key(
     key
 }
 
-fn render_block4(fields: &[RenderedField]) -> String {
+/// Anchored sequences (see [`SequenceSchema::anchor_tag`]) have no `:16R:`/
+/// `:16S:` wrapper in the real wire format — the wrapper is implicit (a
+/// repeating anchor tag), not an explicit envelope. `render_block4` still uses
+/// their occurrence boundaries to order/group fields (via `concrete_sequence_parts`),
+/// it just must not EMIT the wrapper lines for them, or the round-trip render
+/// would inject markers that were never in the original message.
+fn is_anchored_sequence(schema: &MessageSchema, name: &str) -> bool {
+    schema
+        .sequences
+        .get(name)
+        .is_some_and(|sequence| sequence.anchor_tag.is_some())
+}
+
+fn render_block4(schema: &MessageSchema, fields: &[RenderedField]) -> String {
     let mut output = String::new();
     let mut open_path = SmallVec::<[ConcreteSequencePart; 8]>::new();
 
@@ -1688,10 +1731,14 @@ fn render_block4(fields: &[RenderedField]) -> String {
         let target_path = concrete_sequence_parts(&field.sequence_path);
         let common = common_prefix_len(&open_path, &target_path);
         for sequence in open_path[common..].iter().rev() {
-            push_fmt(&mut output, format_args!(":16S:{}\n", sequence.name));
+            if !is_anchored_sequence(schema, &sequence.name) {
+                push_fmt(&mut output, format_args!(":16S:{}\n", sequence.name));
+            }
         }
         for sequence in &target_path[common..] {
-            push_fmt(&mut output, format_args!(":16R:{}\n", sequence.name));
+            if !is_anchored_sequence(schema, &sequence.name) {
+                push_fmt(&mut output, format_args!(":16R:{}\n", sequence.name));
+            }
         }
         open_path = target_path;
         push_fmt(
@@ -1701,7 +1748,9 @@ fn render_block4(fields: &[RenderedField]) -> String {
     }
 
     for sequence in open_path.iter().rev() {
-        push_fmt(&mut output, format_args!(":16S:{}\n", sequence.name));
+        if !is_anchored_sequence(schema, &sequence.name) {
+            push_fmt(&mut output, format_args!(":16S:{}\n", sequence.name));
+        }
     }
 
     output
@@ -3674,5 +3723,127 @@ messages:
                 qualifier: Some("SEME".to_string()),
             }]
         );
+    }
+
+    // ---- Anchored sequences (ADR-0013): MT940-style flat repeating groups ----
+    // with NO :16R:/:16S: wrapper in the wire format.
+
+    const MT940_LIKE_SCHEMA: &str = r"
+field_types:
+  - name: text
+    pattern:
+      - kind: rest
+        name: value
+messages:
+  - message: MT940LIKE
+    sequences:
+      ENTRY:
+        anchor_tag: '61'
+        member_tags: ['86']
+        repeat: true
+    fields:
+      - path: $
+        tag: '20'
+        name: reference
+        type: text
+        required: true
+        entity: statement
+        column: reference
+      - path: ENTRY
+        tag: '61'
+        name: statement_line
+        type: text
+        required: true
+        entity: entry
+        column: line
+      - path: ENTRY
+        tag: '86'
+        name: entry_narrative
+        type: text
+        entity: entry
+        column: narrative
+      - path: $
+        tag: '62F'
+        name: closing_balance
+        type: text
+        required: true
+        entity: statement
+        column: closing_balance
+";
+
+    #[test]
+    fn anchored_sequence_scopes_each_entry_independently() {
+        let catalog = SchemaCatalog::from_yaml_str(MT940_LIKE_SCHEMA).expect("schema loads");
+        catalog.validate().expect("schema validates");
+        let schema = catalog.message("MT940LIKE").expect("schema present");
+        let anchored = anchored_sequences(schema);
+        assert_eq!(anchored.len(), 1, "one anchored sequence declared");
+
+        let raw = b"{4:\n:20:STMT1\n:61:LINE1\n:86:Narrative one\n:61:LINE2\n:86:Narrative two\n:62F:CLOSE\n-}";
+        let parsed = swift_core::parse_message_with_sequences(raw, &anchored);
+        assert!(parsed.diagnostics.is_empty(), "diagnostics: {:?}", parsed.diagnostics);
+
+        let matched = match_and_parse_message(&catalog, schema, &parsed);
+        assert!(matched.missing_required.is_empty(), "{:?}", matched.missing_required);
+        assert!(matched.parse_errors.is_empty(), "{:?}", matched.parse_errors);
+
+        // Each entry's :61: and :86: share one scope; the two entries are distinct.
+        let scopes: Vec<Option<String>> = matched
+            .matched_fields
+            .iter()
+            .map(|m| sequence_path_to_string(m.field.sequence_path.as_slice()))
+            .collect();
+        assert_eq!(
+            scopes,
+            vec![
+                None,                        // :20:
+                Some("ENTRY[0]".to_string()), // :61: line 1
+                Some("ENTRY[0]".to_string()), // :86: narrative 1 — same scope
+                Some("ENTRY[1]".to_string()), // :61: line 2
+                Some("ENTRY[1]".to_string()), // :86: narrative 2 — same scope
+                None,                        // :62F:
+            ]
+        );
+    }
+
+    #[test]
+    fn render_does_not_emit_16r_16s_for_anchored_sequences() {
+        let catalog = SchemaCatalog::from_yaml_str(MT940_LIKE_SCHEMA).expect("schema loads");
+        catalog.validate().expect("schema validates");
+
+        let rendered = render_message(
+            &catalog,
+            &RenderRequest {
+                message_id: "msg-1".to_string(),
+                message_type: "MT940LIKE".to_string(),
+                envelope: RenderEnvelope {
+                    block1: "F01BANKGB22AXXX0000000000".to_string(),
+                    block2: "I940BANKDEFFXXXXN".to_string(),
+                    block3: None,
+                    block5: None,
+                },
+                rows: vec![
+                    render_row("statement", "$", "reference", "STMT1"),
+                    render_row("entry", "ENTRY[0]", "line", "LINE1"),
+                    render_row("entry", "ENTRY[0]", "narrative", "Narrative one"),
+                    render_row("entry", "ENTRY[1]", "line", "LINE2"),
+                    render_row("entry", "ENTRY[1]", "narrative", "Narrative two"),
+                    render_row("statement", "$", "closing_balance", "CLOSE"),
+                ],
+            },
+        )
+        .expect("renders");
+
+        assert!(
+            !rendered.contains("16R") && !rendered.contains("16S"),
+            "anchored sequences must not render :16R:/:16S: wrapper lines:\n{rendered}"
+        );
+        // Fields appear in wire order, byte-exact, with no extra markers.
+        let block4_line_count = rendered.lines().filter(|l| l.starts_with(':')).count();
+        assert_eq!(block4_line_count, 6, "exactly the 6 data lines, no wrapper lines:\n{rendered}");
+        assert!(rendered.contains(":61:LINE1\n"));
+        assert!(rendered.contains(":86:Narrative one\n"));
+        assert!(rendered.contains(":61:LINE2\n"));
+        assert!(rendered.contains(":86:Narrative two\n"));
     }
 }

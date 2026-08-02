@@ -12,6 +12,14 @@ target/
 ui/node_modules/
 ui/dist/
 
+console/node_modules/
+console/dist/
+# Build-time assets: `npm run gen` regenerates these from examples/
+console/src/generated/
+
+# Generated read-model store (regenerable via `ingest store`)
+recon-store/
+
 examples/**/*.duckdb
 examples/**/*.duckdb.wal
 examples/**/*-output/

@@ -822,11 +822,22 @@ fn process_input(request: ProcessInput<'_>) -> Result<PreparedInput> {
         persist_raw_fields,
     } = request;
     let bytes = get_object(store, metrics, input_uri)?;
-    let parsed = parse_input_message(&bytes, input_uri, message_id);
+    let mut parsed = parse_input_message(&bytes, input_uri, message_id);
     let message_type = configured_message_type
         .map(str::to_string)
         .or_else(|| infer_message_type(&parsed))
         .context("message_type was not supplied and could not be inferred from block 2")?;
+    // Some message types (MT940/942/950) repeat a field group with no
+    // :16R:/:16S: wrapper in the wire format (ADR-0013) — the schema declares
+    // this as an anchored sequence. Re-parse with that config so those groups
+    // are correctly scoped; a no-op re-parse for every other (16R/16S-based or
+    // unscoped) schema, since `anchored` is empty unless declared.
+    if let Some(schema) = catalog.message(&message_type) {
+        let anchored = swift_schema::anchored_sequences(schema);
+        if !anchored.is_empty() {
+            parsed = swift_core::parse_message_with_sequences(&bytes, &anchored);
+        }
+    }
     let envelope = source_envelope(&parsed, &message_type);
     let raw_body = if persist_raw_text {
         String::from_utf8(bytes.clone()).context("FIN input must be utf-8 text")?

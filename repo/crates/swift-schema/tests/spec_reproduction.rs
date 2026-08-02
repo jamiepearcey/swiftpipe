@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use swift_core::parse_message;
 use swift_schema::{match_and_parse_message, SchemaCatalog};
 
 struct SpecCase {
@@ -446,6 +445,20 @@ const SPECS: &[SpecCase] = &[
         must_match_fields: &["sender_reference", "preparation_date", "settlement_date"],
         min_matches: 6,
     },
+    SpecCase {
+        message: "MT940",
+        schema_file: "examples/schemas/mt940.yaml",
+        sample_file: "examples/mt940_sample.fin",
+        must_match_fields: &[
+            "transaction_reference",
+            "account_identification",
+            "opening_balance",
+            "statement_line",
+            "entry_narrative",
+            "closing_balance",
+        ],
+        min_matches: 8,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -634,7 +647,11 @@ fn assert_spec_reproduced(case: &SpecCase) {
         .expect("message schema should exist in catalog");
 
     let sample = load_message(case.sample_file);
-    let parsed = parse_message(&sample);
+    // Some message types (MT940/942/950) repeat a field group with no
+    // :16R:/:16S: wrapper (ADR-0013) — the schema declares this as an
+    // anchored sequence. A no-op for every other schema (empty list).
+    let anchored = swift_schema::anchored_sequences(schema);
+    let parsed = swift_core::parse_message_with_sequences(&sample, &anchored);
 
     assert!(
         parsed.diagnostics.is_empty(),
@@ -705,7 +722,8 @@ fn assert_repro_candidate(candidate: &ReproCandidate, should_apply_quality: bool
         let sample_path = examples_dir().join(&candidate.sample_file);
         fs::read(sample_path).expect("sample should be readable")
     };
-    let parsed = parse_message(&sample);
+    let anchored = swift_schema::anchored_sequences(schema);
+    let parsed = swift_core::parse_message_with_sequences(&sample, &anchored);
 
     assert!(
         parsed.diagnostics.is_empty(),

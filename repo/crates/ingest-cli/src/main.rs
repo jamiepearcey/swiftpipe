@@ -10,6 +10,7 @@
 //!                [--schema-dir DIR] [--out-dir DIR]
 //! ```
 
+mod csdr;
 mod serve;
 mod snapshot;
 
@@ -202,14 +203,18 @@ fn run_store() -> Result<()> {
     let mut inputs: Vec<PathBuf> = Vec::new();
     let mut store = PathBuf::from("recon-store");
     let mut schema_dir = PathBuf::from("examples/schemas");
+    let mut penalty_statement: Option<PathBuf> = None;
+    let mut default_currency = String::from("EUR");
 
     let mut args = std::env::args().skip(2);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--store" => store = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--store needs a value"))?,
             "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
+            "--penalty-statement" => penalty_statement = Some(args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--penalty-statement needs a value"))?),
+            "--currency" => default_currency = args.next().ok_or_else(|| anyhow!("--currency needs a value"))?,
             "-h" | "--help" => {
-                eprintln!("usage: ingest store <files...> [--store recon-store] [--schema-dir DIR]");
+                eprintln!("usage: ingest store <files...> [--store recon-store] [--schema-dir DIR] [--penalty-statement FILE.csv] [--currency EUR]");
                 return Ok(());
             }
             other => inputs.push(PathBuf::from(other)),
@@ -226,18 +231,48 @@ fn run_store() -> Result<()> {
         let route = detect(path, &content).with_context(|| format!("detecting type of {}", path.display()))?;
         match route {
             Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
-            Route::PositionsCsv | Route::PositionsMt => events.extend(parse_positions(route, &content, &schema_dir)?),
+            Route::PositionsCsv | Route::PositionsMt => {
+                let mut evs = parse_positions(route, &content, &schema_dir)?;
+                // Give each MT securities file a distinct transaction reference
+                // (its stem) instead of the placeholder id, so penalty accruals
+                // and recon keys are per-transaction rather than colliding.
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("mt");
+                for e in &mut evs {
+                    if e.message_id == "cli" {
+                        e.message_id = stem.to_string();
+                    }
+                }
+                events.extend(evs);
+            }
         }
     }
+
+    // CSDR expected penalties, computed from the failing/pending events.
+    let accruals = ingest_penalty::compute_penalty_accruals(
+        &events,
+        &ingest_penalty::PenaltyRateTable::starter(),
+        &default_currency,
+    );
+    // The CSD monthly penalty statement (reported figures), when provided.
+    let reported = match &penalty_statement {
+        Some(path) => {
+            let csv = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+            ingest_penalty::parse_penalty_statement_csv(&csv)
+        }
+        None => Vec::new(),
+    };
 
     std::fs::create_dir_all(&store).with_context(|| format!("creating store {}", store.display()))?;
     ingest_parquet::write_cash_statements(&statements, &store.join("cash_statements.parquet"))?;
     ingest_parquet::write_cash_entries(&statements, &store.join("cash_entries.parquet"))?;
     ingest_parquet::write_security_events(&events, &store.join("positions.parquet"))?;
+    ingest_parquet::write_penalty_accruals(&accruals, &store.join("penalty_accruals.parquet"))?;
+    ingest_parquet::write_penalty_statements(&reported, &store.join("penalty_statements.parquet"))?;
 
     println!("statements : {}", statements.len());
     println!("entries    : {}", statements.iter().map(|s| s.entries.len()).sum::<usize>());
     println!("positions  : {}", events.iter().filter(|e| e.isin.is_some()).count());
+    println!("penalties  : {} computed, {} reported", accruals.len(), reported.len());
     println!("→ store {}", store.display());
     Ok(())
 }

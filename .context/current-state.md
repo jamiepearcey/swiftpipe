@@ -39,6 +39,44 @@
 
 ## Recently completed work
 
+- Added **anchored sequences** (ADR-0013): `swift-core` and `swift-schema`
+  now support message types whose repeating field group has no `:16R:`/
+  `:16S:` wrapper (a schema declares an `anchor_tag`/`member_tags` sequence).
+  Added a real, spec-correct `examples/schemas/mt940.yaml` — MT940 (SWIFT
+  Category 9 Customer Statement) now flows through the exact same
+  parse/materialize/render pipeline as every other MT type, with zero
+  special-casing in `swift-api`. Fixed `render_block4` (it unconditionally
+  emitted `:16R:`/`:16S:` for every sequence — anchored ones must not render a
+  wrapper). Added `examples/.uhb/finmt940.md` (manually transcribed from the
+  authoritative SWIFT Category 9 spec — iso20022.org's UHB catalogue 404s for
+  MT940; it only covers the later ISO 15022 generic-field message family) and
+  registered MT940 in the golden/spec-reproduction test suites (62 schemas
+  now, was 61). Fixed a real console bug found along the way: `Parser.tsx`
+  stripped the `MT` prefix before sending `message_type` to `swift-api`,
+  which never matched the schema catalog's keys — the "Validate on server"
+  button silently mismatched for every message type, not just MT940. Full
+  workspace `cargo test` green (52 test groups, 0 failures) including the
+  swift-duckdb full-corpus round-trip (all 62 schemas) and the UHB
+  spec-reproduction suite.
+- Added the **CSDR cash-penalty framework** (ADR-0012): a new pure crate
+  `ingest-penalty` computes expected settlement-fail penalties (SEFP =
+  rate_bps/10_000 × reference_amount, starter rate table by instrument type)
+  from failing/pending MT537 events, imports the CSD monthly statement
+  (`--penalty-statement CSV`), and reconciles computed vs reported → breaks.
+  `SecurityEvent` gained `amount`/`currency` (the penalty base). The `ingest
+  serve` read-model gained `GET /csdr/snapshot`; `ingest store` writes
+  `penalty_accruals.parquet` + `penalty_statements.parquet`. Both the swiftpipe
+  console and the quant/pricing UI surface a CSDR penalty-recon section over
+  `/csdr`. Sample data: `examples/mt537_{gilt,bond}_sample.fin` +
+  `examples/mt537_penalty_statement.csv`. Starter/non-certified (see ADR-0012).
+- Added MT537 (Statement of Pending Transactions) support end-to-end: the
+  normalized `SecurityEvent` now carries an optional `status`, `swift-normalize`
+  captures the per-transaction status code (`:25D::IPRC//PEND`) and the MT537
+  safekeeping account, `ingest-parquet` persists `status` on the data plane,
+  `ingest-tabular` reads an optional `status` column (cross-source), and a real
+  MT537 fixture test asserts `status = "PEND"`. Fixed the `mt537_qualified_status`
+  schema type (`/` → `//`) so `:25D:`/`:24B:` codes capture cleanly; MT537 golden
+  refreshed.
 - Moved into finance container structure.
 - Added project-level overview documentation.
 - Hardened `swift-core` with crate-level deny attributes for warnings,

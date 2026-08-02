@@ -32,7 +32,7 @@ pub fn parse_csv(csv: &str) -> Vec<SecurityEvent> {
         None => return Vec::new(),
     };
     let idx = |name: &str| header.iter().position(|h| h == name);
-    let (i_isin, i_qty, i_acct, i_date, i_party, i_id, i_desc) = (
+    let (i_isin, i_qty, i_acct, i_date, i_party, i_id, i_desc, i_status, i_amount, i_ccy) = (
         idx("isin"),
         idx("quantity"),
         idx("account"),
@@ -40,6 +40,9 @@ pub fn parse_csv(csv: &str) -> Vec<SecurityEvent> {
         idx("party"),
         idx("id"),
         idx("description"),
+        idx("status"),
+        idx("amount"),
+        idx("currency"),
     );
 
     rows.enumerate()
@@ -58,9 +61,12 @@ pub fn parse_csv(csv: &str) -> Vec<SecurityEvent> {
                 isin: get(i_isin).filter(|s| is_isin(s)),
                 instrument_desc: get(i_desc),
                 quantity: get(i_qty).and_then(|q| q.parse::<f64>().ok()),
+                amount: get(i_amount).and_then(|a| a.parse::<f64>().ok()),
+                currency: get(i_ccy),
                 settlement_date: get(i_date),
                 safekeeping_account: get(i_acct),
                 party_bic: get(i_party),
+                status: get(i_status),
             }
         })
         .collect()

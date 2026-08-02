@@ -1891,6 +1891,7 @@ dependencies = [
  "duckdb",
  "ingest-core",
  "ingest-parquet",
+ "ingest-penalty",
  "ingest-pnl",
  "ingest-tabular",
  "mx-camt",
@@ -1919,8 +1920,21 @@ dependencies = [
  "anyhow",
  "arrow 55.2.0",
  "ingest-core",
+ "ingest-penalty",
  "parquet",
  "tempfile",
+]
+
+[[package]]
+name = "ingest-penalty"
+version = "0.1.0"
+dependencies = [
+ "ingest-core",
+ "serde",
+ "swift-core",
+ "swift-db",
+ "swift-normalize",
+ "swift-schema",
 ]
 
 [[package]]

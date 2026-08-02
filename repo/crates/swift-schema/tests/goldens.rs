@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
-use swift_core::{parse_message, SequenceFrame};
+use swift_core::SequenceFrame;
 use swift_schema::{match_and_parse_message, CapturedFieldValue, SchemaCatalog};
 
 struct GoldenCase {
@@ -318,6 +318,11 @@ const GOLDEN_CASES: &[GoldenCase] = &[
         sample_file: "mt671_sample.fin",
         snapshot_file: "mt671.ndjson",
     },
+    GoldenCase {
+        message_type: "MT940",
+        sample_file: "mt940_sample.fin",
+        snapshot_file: "mt940.ndjson",
+    },
 ];
 
 fn repo_root() -> PathBuf {
@@ -402,7 +407,10 @@ fn normalized_snapshot(case: &GoldenCase) -> String {
         .message(case.message_type)
         .expect("message schema should exist");
     let input = load_sample(case.sample_file);
-    let parsed = parse_message(&input);
+    // Some message types (MT940/942/950) repeat a field group with no
+    // :16R:/:16S: wrapper (ADR-0013) — a no-op for every other schema.
+    let anchored = swift_schema::anchored_sequences(schema);
+    let parsed = swift_core::parse_message_with_sequences(&input, &anchored);
     assert!(
         parsed.diagnostics.is_empty(),
         "sample should parse without core diagnostics: {:?}",
@@ -872,4 +880,9 @@ fn mt670_normalized_output_matches_golden() {
 #[test]
 fn mt671_normalized_output_matches_golden() {
     assert_golden(&GOLDEN_CASES[60]);
+}
+
+#[test]
+fn mt940_normalized_output_matches_golden() {
+    assert_golden(&GOLDEN_CASES[61]);
 }

@@ -82,7 +82,7 @@ field_types:
         value_type: alpha_num
         length: 4
       - kind: literal
-        value: "/"
+        value: "//"
       - kind: rest
         name: code
   - name: mt537_text

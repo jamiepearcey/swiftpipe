@@ -20,6 +20,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "signal
 duckdb = { version = "1.10501.0", features = ["bundled"] }
 ingest-core = { path = "../ingest-core" }
 ingest-parquet = { path = "../ingest-parquet" }
+ingest-penalty = { path = "../ingest-penalty" }
 ingest-pnl = { path = "../ingest-pnl" }
 ingest-tabular = { path = "../ingest-tabular" }
 swift-core = { path = "../swift-core" }

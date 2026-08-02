@@ -1,0 +1,147 @@
+---
+# MT940 (Customer Statement Message, SWIFT Category 9) — a **flat** message
+# with no :16R:/:16S: sequence wrapper. Sequence A (General Information) and
+# Sequence C (closing) are single, mandatory groups at the root; Sequence B
+# (Statement Line) is a repetitive group anchored on tag 61, with an optional
+# tag 86 attached to it (ADR-0013's `anchor_tag`/`member_tags`) — the wire-level
+# grouping is by tag adjacency, not a wrapper tag, matching the real spec.
+#
+# Field formats are per the SWIFT Category 9 message reference (User Handbook):
+#   20   Transaction Reference Number      16x
+#   25   Account Identification            35x
+#   28C  Statement/Sequence Number         5n[/5n]
+#   60a  Opening Balance (F or M)          1!a6!n3!a15d
+#   61   Statement Line                    6!n[4!n]2a[1!a]15d1!a3!c16x[//16x][34x]
+#   86   Information to Account Owner      6*65x (conditional: tied to the
+#                                          preceding 61 inside the group;
+#                                          optional and unattached at the root)
+#   62a  Closing Balance (F or M)          1!a6!n3!a15d
+#   64   Closing Available Balance         1!a6!n3!a15d
+#   65   Forward Available Balance         1!a6!n3!a15d
+#
+# Fields have no `::qualifier//` wrapper (unlike the generic MT5xx fields in
+# the other schemas here) — the value follows the tag delimiter directly — so
+# every field type here is a plain passthrough capture; sub-decomposition of
+# :61:'s variable-width D/C mark (1 char, or 2 for RC/RD) isn't expressible as
+# a fixed capture chain without alternation, so the full value is captured
+# verbatim (byte-exact for render round-trip) and decoded downstream (the
+# console's client-side `fin.ts`/`finDecode.ts`, or `swift_mt940::parse_mt940`
+# for the normalized `CashStatement` model).
+field_types:
+- name: mt940_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT940
+  category: cash
+  version: starter
+  coverage:
+    source: SWIFT Category 9 Customer Statement Message (MT940) — field formats
+      per the SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 1
+    expected_fields: 10
+    notes:
+    - "Sequence A (General Information): 20, 25, 28C, 60a — mandatory, once."
+    - "Sequence B (Statement Line): 61 (repetitive) with an optional attached
+       86 — an *anchored* sequence (ADR-0013): no :16R:/:16S: wrapper in the
+       wire format; grouping is by tag adjacency, matching the real MT940
+       convention (this message type predates the 16R/16S linkage-sequence
+       convention used by later ISO 15022 message types like MT535/537)."
+    - "Sequence C (closing): 62a, 64, 65, and a final, unattached 86 —
+       mandatory/optional, once."
+    - "Field 21 (Related Reference) and repeated (multi-currency) 65
+       occurrences are not yet covered — starter schema, not certified
+       coverage."
+  sequences:
+    ENTRY:
+      anchor_tag: "61"
+      member_tags: ["86"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_statement
+    column: reference
+  - path: $
+    tag: "25"
+    name: account_identification
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_statement
+    column: account
+  - path: $
+    tag: "28C"
+    name: statement_number
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_statement
+    column: statement_number
+  - path: $
+    tag: 60a
+    options: ["F", "M"]
+    name: opening_balance
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_statement
+    column: opening_balance
+    render:
+      option: F
+  - path: ENTRY
+    tag: "61"
+    name: statement_line
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_entry
+    column: line
+  - path: ENTRY
+    tag: "86"
+    name: entry_narrative
+    type: mt940_text
+    entity: mt940_entry
+    column: narrative
+  - path: $
+    tag: 62a
+    options: ["F", "M"]
+    name: closing_balance
+    type: mt940_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt940_statement
+    column: closing_balance
+    render:
+      option: F
+  - path: $
+    tag: "64"
+    name: closing_available_balance
+    type: mt940_text
+    entity: mt940_statement
+    column: available_balance
+  - path: $
+    tag: "65"
+    name: forward_available_balance
+    type: mt940_text
+    entity: mt940_statement
+    column: forward_balance
+  - path: $
+    tag: "86"
+    name: statement_narrative
+    type: mt940_text
+    entity: mt940_statement
+    column: narrative

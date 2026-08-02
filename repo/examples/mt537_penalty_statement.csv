@@ -1,0 +1,5 @@
+penalty_ref,transaction_ref,isin,counterparty,currency,penalty_type,amount,period,direction
+PEN-2026-05-001,mt537_sample,GB00B03MLX29,BANKGB22XXX,GBP,SEFP,1.23,2026-05,payable
+PEN-2026-05-002,mt537_gilt_sample,GB00BBJNQY21,BANKGB22XXX,GBP,SEFP,50.00,2026-05,payable
+PEN-2026-05-003,mt537_bond_sample,XS2000000001,BANKGB22XXX,GBP,SEFP,41.50,2026-05,payable
+PEN-2026-05-004,MT537ALLEG9,GB00B03MLX29,BANKFRPPXXX,GBP,SEFP,12.75,2026-05,receivable

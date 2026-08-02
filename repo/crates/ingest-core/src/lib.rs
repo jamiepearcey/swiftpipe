@@ -51,9 +51,20 @@ pub struct SecurityEvent {
     pub isin: Option<String>,
     pub instrument_desc: Option<String>,
     pub quantity: Option<f64>,
+    /// Posting / settlement amount of the transaction, when reported (e.g. an
+    /// MT537 `:19A::PSTA` posting amount). This is the base a CSDR cash penalty
+    /// is computed against. `None` for holdings and records with no money leg.
+    pub amount: Option<f64>,
+    /// Settlement currency of `amount`, when resolvable.
+    pub currency: Option<String>,
     pub settlement_date: Option<String>,
     pub safekeeping_account: Option<String>,
     pub party_bic: Option<String>,
+    /// Processing / settlement status of the record, when the source reports one
+    /// (e.g. an MT537 *Statement of Pending Transactions* carries a per-status
+    /// code such as `PEND`/`PENF`; custodian files may carry a `status` column).
+    /// `None` for sources/messages that don't express a status.
+    pub status: Option<String>,
 }
 
 /// A source adapter turns source-specific input into normalized [`SecurityEvent`]s.

@@ -18,7 +18,9 @@ use anyhow::{Context, Result};
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use duckdb::Connection;
 
+use crate::csdr::CsdrSnapshot;
 use crate::snapshot::{ReconSnapshot, SnapshotEntry, SnapshotPosition, SnapshotStatement};
+use ingest_penalty::{PenaltyAccrual, ReportedPenalty};
 
 struct AppState {
     store: PathBuf,
@@ -34,12 +36,13 @@ async fn serve(store: PathBuf, bind: SocketAddr) -> Result<()> {
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/recon/snapshot", get(snapshot_handler))
+        .route("/csdr/snapshot", get(csdr_handler))
         .with_state(state);
     let listener = tokio::net::TcpListener::bind(bind)
         .await
         .with_context(|| format!("binding {bind}"))?;
     println!("recon read-model service on http://{bind}  (store: {})", store.display());
-    println!("  GET /recon/snapshot   GET /healthz");
+    println!("  GET /recon/snapshot   GET /csdr/snapshot   GET /healthz");
     axum::serve(listener, app).await?;
     Ok(())
 }
@@ -61,6 +64,83 @@ pub fn read_snapshot(store: &Path) -> Result<ReconSnapshot> {
     let statements = read_statements(&conn, store)?;
     let positions = read_positions(&conn, store)?;
     Ok(ReconSnapshot::from_parts(statements, positions))
+}
+
+async fn csdr_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let store = state.store.clone();
+    match tokio::task::spawn_blocking(move || read_csdr_snapshot(&store)).await {
+        Ok(Ok(snap)) => (StatusCode::OK, Json(snap)).into_response(),
+        Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+    }
+}
+
+/// Query the penalty Parquet tables and run the pure reconciliation into a CSDR
+/// snapshot. Missing tables → empty accruals/reported → an empty, reconciled
+/// snapshot (graceful, same as the recon read-model).
+pub fn read_csdr_snapshot(store: &Path) -> Result<CsdrSnapshot> {
+    let conn = Connection::open_in_memory().context("opening DuckDB")?;
+    let accruals = read_penalty_accruals(&conn, store)?;
+    let reported = read_reported_penalties(&conn, store)?;
+    Ok(CsdrSnapshot::from_penalties(accruals, reported))
+}
+
+fn read_penalty_accruals(conn: &Connection, store: &Path) -> Result<Vec<PenaltyAccrual>> {
+    let Some(path) = table(store, "penalty_accruals.parquet") else {
+        return Ok(Vec::new());
+    };
+    let mut q = conn.prepare(&format!(
+        "SELECT source, transaction_ref, isin, instrument_desc, instrument_type, counterparty_bic, \
+                currency, quantity, reference_amount, penalty_type, penalty_rate_bps, status, \
+                intended_settlement_date, computed_amount, direction \
+         FROM read_parquet('{path}')"
+    ))?;
+    let rows = q.query_map([], |r| {
+        Ok(PenaltyAccrual {
+            source: r.get::<_, String>(0)?,
+            transaction_ref: r.get::<_, String>(1)?,
+            isin: r.get::<_, String>(2)?,
+            instrument_desc: r.get::<_, Option<String>>(3)?,
+            instrument_type: r.get::<_, String>(4)?,
+            counterparty_bic: r.get::<_, Option<String>>(5)?,
+            currency: r.get::<_, String>(6)?,
+            quantity: r.get::<_, Option<f64>>(7)?,
+            reference_amount: r.get::<_, f64>(8)?,
+            penalty_type: r.get::<_, String>(9)?,
+            penalty_rate_bps: r.get::<_, f64>(10)?,
+            status: r.get::<_, String>(11)?,
+            intended_settlement_date: r.get::<_, Option<String>>(12)?,
+            business_days_failed: 1,
+            computed_amount: r.get::<_, f64>(13)?,
+            direction: r.get::<_, String>(14)?,
+        })
+    })?;
+    rows.map(|r| r.map_err(Into::into)).collect()
+}
+
+fn read_reported_penalties(conn: &Connection, store: &Path) -> Result<Vec<ReportedPenalty>> {
+    let Some(path) = table(store, "penalty_statements.parquet") else {
+        return Ok(Vec::new());
+    };
+    let mut q = conn.prepare(&format!(
+        "SELECT penalty_ref, transaction_ref, isin, counterparty_bic, currency, penalty_type, \
+                period, reported_amount, direction \
+         FROM read_parquet('{path}')"
+    ))?;
+    let rows = q.query_map([], |r| {
+        Ok(ReportedPenalty {
+            penalty_ref: r.get::<_, String>(0)?,
+            transaction_ref: r.get::<_, String>(1)?,
+            isin: r.get::<_, String>(2)?,
+            counterparty_bic: r.get::<_, Option<String>>(3)?,
+            currency: r.get::<_, String>(4)?,
+            penalty_type: r.get::<_, String>(5)?,
+            period: r.get::<_, Option<String>>(6)?,
+            reported_amount: r.get::<_, f64>(7)?,
+            direction: r.get::<_, String>(8)?,
+        })
+    })?;
+    rows.map(|r| r.map_err(Into::into)).collect()
 }
 
 /// A store file path escaped for a DuckDB single-quoted string literal, or

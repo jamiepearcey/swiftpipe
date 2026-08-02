@@ -1238,7 +1238,7 @@ messages:
     #[test]
     fn parses_renders_and_validates_all_local_example_message_types() {
         let cases = local_example_cases();
-        assert_eq!(cases.len(), 61, "expected the local 61-sample corpus");
+        assert_eq!(cases.len(), 62, "expected the local 62-sample corpus");
 
         let conn = Connection::open_in_memory().expect("opens duckdb");
         conn.execute(
@@ -1274,7 +1274,14 @@ messages:
         let mut output = ParsedOutputBatch::empty();
         let mut processed_ids = Vec::new();
         for message in &inbound.messages {
-            let parsed = parse_message(message.body.as_bytes());
+            // Some message types (MT940/942/950) repeat a field group with no
+            // :16R:/:16S: wrapper (ADR-0013) — their schema declares this as
+            // an anchored sequence. A no-op for every other type here.
+            let anchored = catalog
+                .message(&message.message_type)
+                .map(swift_schema::anchored_sequences)
+                .unwrap_or_default();
+            let parsed = swift_core::parse_message_with_sequences(message.body.as_bytes(), &anchored);
             assert!(
                 parsed.diagnostics.is_empty(),
                 "{} sample should parse without diagnostics: {:?}",
@@ -1319,13 +1326,15 @@ messages:
             )
             .unwrap_or_else(|error| panic!("{message_type} should render: {error}"));
 
-            let parsed_rendered = parse_message(rendered.as_bytes());
+            let schema = catalog.message(message_type).expect("message schema");
+            let anchored = swift_schema::anchored_sequences(schema);
+            let parsed_rendered =
+                swift_core::parse_message_with_sequences(rendered.as_bytes(), &anchored);
             assert!(
                 parsed_rendered.diagnostics.is_empty(),
                 "{message_type} rendered with diagnostics: {:?}",
                 parsed_rendered.diagnostics
             );
-            let schema = catalog.message(message_type).expect("message schema");
             let matched = match_and_parse_message(&catalog, schema, &parsed_rendered);
             assert!(
                 matched.parse_errors.is_empty(),

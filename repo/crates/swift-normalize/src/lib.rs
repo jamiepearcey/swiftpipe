@@ -64,13 +64,30 @@ pub fn normalize(batch: &ParsedOutputBatch) -> Vec<SecurityEvent> {
                 quantity: scan_column(&rows, |t, c| t == "settlement_quantity" && c == "quantity")
                     .or_else(|| scan_column(&rows, |_, c| c == "quantity"))
                     .and_then(|v| v.parse::<f64>().ok()),
+                // Posting / settlement amount — the CSDR penalty base. MT537 keeps
+                // it under `mt537_transaction.amount` (:19A::PSTA); prefer that over
+                // any reported-penalty amounts in a PENA block.
+                amount: scan_column(&rows, |t, c| t.contains("transaction") && c == "amount")
+                    .or_else(|| scan_column(&rows, |_, c| c == "amount"))
+                    .and_then(|v| v.parse::<f64>().ok()),
+                // Currency is stripped from the amount at the materialize layer, so
+                // it is only present when a source carries a distinct currency field.
+                currency: scan_column(&rows, |_, c| c.contains("currenc")),
                 settlement_date: scan_column(&rows, |t, c| t == "settlement_trade" && c == "settlement_date")
                     .or_else(|| scan_column(&rows, |_, c| c.contains("settlement") && c.contains("date")))
                     .or_else(|| scan_column(&rows, |_, c| c.contains("date"))),
                 safekeeping_account: scan_column(&rows, |_, c| c.contains("safekeep"))
-                    .or_else(|| scan_column(&rows, |t, c| t == "settlement_account" && c.contains("account"))),
+                    .or_else(|| scan_column(&rows, |t, c| t == "settlement_account" && c.contains("account")))
+                    // MT537 keeps the safekeeping account under an `*account` entity
+                    // with a plain `account` column.
+                    .or_else(|| scan_column(&rows, |t, c| c == "account" && t.contains("account"))),
                 party_bic: scan_column(&rows, |t, c| t == "settlement_party" && c == "party")
                     .or_else(|| scan_column(&rows, |_, c| c == "party")),
+                // Statement-of-status messages (MT537 pending transactions) report a
+                // per-transaction status code (:25D::IPRC//PEND). Other securities
+                // flows have no status, leaving this `None`.
+                status: scan_column(&rows, |t, c| c == "status_code" && t.contains("status"))
+                    .or_else(|| scan_column(&rows, |_, c| c == "status_code")),
             })
         })
         .collect()
@@ -110,11 +127,14 @@ mod tests {
 
     const MT535_FIN: &str = include_str!("../../../examples/mt535_sample.fin");
     const MT535_SCHEMA: &str = include_str!("../../../examples/schemas/mt535.yaml");
+    const MT537_FIN: &str = include_str!("../../../examples/mt537_sample.fin");
+    const MT537_SCHEMA: &str = include_str!("../../../examples/schemas/mt537.yaml");
 
     #[test]
     fn classify_message_types() {
         assert_eq!(classify("MT535"), EventKind::Holding);
         assert_eq!(classify("mt542"), EventKind::Settlement);
+        assert_eq!(classify("MT537"), EventKind::Settlement);
         assert_eq!(classify("MT515"), EventKind::TradeConfirm);
         assert_eq!(classify("MT999"), EventKind::Other);
     }
@@ -139,6 +159,40 @@ mod tests {
         assert_eq!(e.kind, EventKind::Holding);
         assert_eq!(e.isin.as_deref(), Some("GB00B03MLX29"));
         assert_eq!(e.quantity, Some(1000.0));
+        assert!(e.settlement_date.is_some());
+        assert!(e.safekeeping_account.is_some());
+        // A holding statement is not a status report — no pending status.
+        assert_eq!(e.status, None);
+    }
+
+    #[test]
+    fn maps_real_mt537_pending_transaction_to_settlement_event() {
+        // MT537 is a Statement of Pending Transactions — the defining datum is the
+        // per-transaction status (:25D::IPRC//PEND). Support means that status
+        // survives normalization into the platform's SecurityEvent, alongside the
+        // instrument / quantity / settlement date it reports.
+        let catalog = SchemaCatalog::from_yaml_str(MT537_SCHEMA).expect("load mt537 schema");
+        catalog.validate().expect("valid schema");
+        let inbound = InboundMessage {
+            id: "msg-537".into(),
+            message_type: "MT537".into(),
+            body: MT537_FIN.into(),
+        };
+        let parsed = parse_message(inbound.body.as_bytes());
+        let batch = materialize_message(&catalog, &inbound, &parsed).expect("materialize");
+
+        let events = SwiftSource.ingest(&batch);
+        assert_eq!(events.len(), 1);
+        let e = &events[0];
+        assert_eq!(e.source, "swift");
+        assert_eq!(e.kind, EventKind::Settlement);
+        assert_eq!(e.isin.as_deref(), Some("GB00B03MLX29"));
+        assert_eq!(e.quantity, Some(1000.0));
+        assert_eq!(
+            e.status.as_deref(),
+            Some("PEND"),
+            "the MT537 pending status must survive normalization"
+        );
         assert!(e.settlement_date.is_some());
         assert!(e.safekeeping_account.is_some());
     }

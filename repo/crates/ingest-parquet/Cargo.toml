@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 ingest-core = { path = "../ingest-core" }
+ingest-penalty = { path = "../ingest-penalty" }
 arrow = "55"
 parquet = "55"
 anyhow = "1"

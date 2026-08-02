@@ -5,6 +5,7 @@ members = [
     "crates/ingest-cli",
     "crates/ingest-core",
     "crates/ingest-parquet",
+    "crates/ingest-penalty",
     "crates/ingest-pnl",
     "crates/ingest-tabular",
     "crates/mx-camt",

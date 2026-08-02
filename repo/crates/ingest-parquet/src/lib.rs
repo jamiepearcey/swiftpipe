@@ -18,6 +18,7 @@ use arrow::record_batch::RecordBatch;
 use parquet::arrow::ArrowWriter;
 
 use ingest_core::{CashStatement, SecurityEvent};
+use ingest_penalty::{PenaltyAccrual, ReportedPenalty};
 
 /// Build an Arrow RecordBatch for a set of securities events.
 pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, ArrowError> {
@@ -32,6 +33,7 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
         Field::new("settlement_date", DataType::Utf8, true),
         Field::new("safekeeping_account", DataType::Utf8, true),
         Field::new("party_bic", DataType::Utf8, true),
+        Field::new("status", DataType::Utf8, true),
     ]));
     let cols: Vec<ArrayRef> = vec![
         Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.source.as_str()))),
@@ -44,6 +46,7 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
         Arc::new(StringArray::from_iter(events.iter().map(|e| e.settlement_date.clone()))),
         Arc::new(StringArray::from_iter(events.iter().map(|e| e.safekeeping_account.clone()))),
         Arc::new(StringArray::from_iter(events.iter().map(|e| e.party_bic.clone()))),
+        Arc::new(StringArray::from_iter(events.iter().map(|e| e.status.clone()))),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -117,6 +120,72 @@ pub fn cash_entries_batch(statements: &[CashStatement]) -> Result<RecordBatch, A
     RecordBatch::try_new(schema, cols)
 }
 
+/// Build an Arrow RecordBatch for computed CSDR penalty accruals.
+pub fn penalty_accruals_batch(accruals: &[PenaltyAccrual]) -> Result<RecordBatch, ArrowError> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("source", DataType::Utf8, false),
+        Field::new("transaction_ref", DataType::Utf8, false),
+        Field::new("isin", DataType::Utf8, false),
+        Field::new("instrument_desc", DataType::Utf8, true),
+        Field::new("instrument_type", DataType::Utf8, false),
+        Field::new("counterparty_bic", DataType::Utf8, true),
+        Field::new("currency", DataType::Utf8, false),
+        Field::new("quantity", DataType::Float64, true),
+        Field::new("reference_amount", DataType::Float64, false),
+        Field::new("penalty_type", DataType::Utf8, false),
+        Field::new("penalty_rate_bps", DataType::Float64, false),
+        Field::new("status", DataType::Utf8, false),
+        Field::new("intended_settlement_date", DataType::Utf8, true),
+        Field::new("computed_amount", DataType::Float64, false),
+        Field::new("direction", DataType::Utf8, false),
+    ]));
+    let cols: Vec<ArrayRef> = vec![
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.source.as_str()))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.transaction_ref.as_str()))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.isin.as_str()))),
+        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.instrument_desc.clone()))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.instrument_type.as_str()))),
+        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.counterparty_bic.clone()))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.currency.as_str()))),
+        Arc::new(Float64Array::from_iter(accruals.iter().map(|a| a.quantity))),
+        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.reference_amount))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.penalty_type.as_str()))),
+        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.penalty_rate_bps))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.status.as_str()))),
+        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.intended_settlement_date.clone()))),
+        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.computed_amount))),
+        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.direction.as_str()))),
+    ];
+    RecordBatch::try_new(schema, cols)
+}
+
+/// Build an Arrow RecordBatch for CSD-reported penalty statement lines.
+pub fn penalty_statements_batch(reported: &[ReportedPenalty]) -> Result<RecordBatch, ArrowError> {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("penalty_ref", DataType::Utf8, false),
+        Field::new("transaction_ref", DataType::Utf8, false),
+        Field::new("isin", DataType::Utf8, false),
+        Field::new("counterparty_bic", DataType::Utf8, true),
+        Field::new("currency", DataType::Utf8, false),
+        Field::new("penalty_type", DataType::Utf8, false),
+        Field::new("period", DataType::Utf8, true),
+        Field::new("reported_amount", DataType::Float64, false),
+        Field::new("direction", DataType::Utf8, false),
+    ]));
+    let cols: Vec<ArrayRef> = vec![
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.penalty_ref.as_str()))),
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.transaction_ref.as_str()))),
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.isin.as_str()))),
+        Arc::new(StringArray::from_iter(reported.iter().map(|r| r.counterparty_bic.clone()))),
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.currency.as_str()))),
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.penalty_type.as_str()))),
+        Arc::new(StringArray::from_iter(reported.iter().map(|r| r.period.clone()))),
+        Arc::new(Float64Array::from_iter_values(reported.iter().map(|r| r.reported_amount))),
+        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.direction.as_str()))),
+    ];
+    RecordBatch::try_new(schema, cols)
+}
+
 /// Write a RecordBatch to a Parquet file.
 pub fn write_parquet(batch: &RecordBatch, path: &Path) -> anyhow::Result<()> {
     let file = File::create(path)?;
@@ -139,6 +208,16 @@ pub fn write_cash_entries(statements: &[CashStatement], path: &Path) -> anyhow::
 /// Convenience: cash statement headers → Parquet file (one row per statement).
 pub fn write_cash_statements(statements: &[CashStatement], path: &Path) -> anyhow::Result<()> {
     write_parquet(&cash_statements_batch(statements)?, path)
+}
+
+/// Convenience: computed CSDR penalty accruals → Parquet file.
+pub fn write_penalty_accruals(accruals: &[PenaltyAccrual], path: &Path) -> anyhow::Result<()> {
+    write_parquet(&penalty_accruals_batch(accruals)?, path)
+}
+
+/// Convenience: CSD-reported penalty statement lines → Parquet file.
+pub fn write_penalty_statements(reported: &[ReportedPenalty], path: &Path) -> anyhow::Result<()> {
+    write_parquet(&penalty_statements_batch(reported)?, path)
 }
 
 #[cfg(test)]
@@ -186,7 +265,7 @@ mod tests {
         let batches = read_rows(&path);
         let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         assert_eq!(rows, 2);
-        assert_eq!(batches[0].num_columns(), 10);
+        assert_eq!(batches[0].num_columns(), 11);
     }
 
     #[test]
