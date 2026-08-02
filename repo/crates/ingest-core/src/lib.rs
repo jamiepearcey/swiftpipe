@@ -46,6 +46,11 @@ pub struct SecurityEvent {
     /// Which source produced this (`"swift"`, `"tabular"`, …) — provenance.
     pub source: String,
     pub message_id: String,
+    /// The per-transaction reference a CSD penalty statement keys on (MT537
+    /// `:20C::RELA` / `:20C::SEME`). Unlike `message_id`, which identifies the
+    /// owning message, this identifies the individual transaction inside it —
+    /// a message can carry more than one.
+    pub transaction_ref: Option<String>,
     pub message_type: String,
     pub kind: EventKind,
     pub isin: Option<String>,

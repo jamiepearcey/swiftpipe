@@ -97,7 +97,16 @@ pub struct CsdrSnapshot {
 }
 
 impl CsdrSnapshot {
-    pub const VERSION: u32 = 1;
+    /// `1`: amounts were unsigned magnitudes (`direction` was carried but not
+    /// applied). `2`: amounts became direction-signed per
+    /// [`ingest_penalty`]'s convention — `payable` negative, `receivable`
+    /// positive — across `computed_amount`, `reported_amount`, every recon
+    /// line (`computed`/`reported`/`diff`), and every summary total
+    /// (`computed_total`/`reported_total`/`net_diff`); `break_amount` stays a
+    /// non-negative magnitude. A consumer pinned to v1 must not read v2
+    /// amounts as unsigned — a computed payable that now nets against a
+    /// reported receivable was silently miscounted as a match under v1.
+    pub const VERSION: u32 = 2;
 
     /// Build from computed accruals + CSD-reported penalties: runs the pure
     /// reconciliation and flattens both sides to the UI contract.

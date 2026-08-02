@@ -1025,6 +1025,29 @@ SECOND LINE
     }
 
     #[test]
+    fn anchored_sequence_closes_when_a_wrapped_sequence_opens() {
+        // A schema could plausibly mix an anchored group (MT940-style 61/86)
+        // with an ordinary 16R/16S-wrapped sequence elsewhere in the same
+        // message. The wrapped sequence opening while the anchor is still
+        // "open" must close the anchor — it must NOT leave `open_anchor`
+        // stale so that a later root-scope :86: (after the wrapper closes)
+        // gets swept into the earlier anchored occurrence.
+        let message = b"{4:\n:61:2605130513C25000,00NTRFCUST-A//BANKREF-A\n:86:Coupon receipt\n\
+                        :16R:LINK\n:20C::RELA//REL1\n:16S:LINK\n\
+                        :86:Trailer narrative\n-}";
+        let parsed = parse_message_with_sequences(message, &[mt940_anchor()]);
+        assert!(parsed.diagnostics.is_empty(), "diagnostics: {:?}", parsed.diagnostics);
+
+        let trailer = parsed.fields.last().expect("trailer field present");
+        assert_eq!(trailer.tag, b"86");
+        assert!(
+            trailer.sequence_path.is_empty(),
+            "trailing :86: after the wrapped sequence closes must be at root scope, \
+             not attached to the earlier anchored ENTRY occurrence"
+        );
+    }
+
+    #[test]
     fn empty_anchored_list_leaves_existing_16r_16s_behavior_unchanged() {
         // Sanity: passing no anchored sequences (the default `parse_message`
         // path) behaves identically to a real 16R/16S message — anchors never

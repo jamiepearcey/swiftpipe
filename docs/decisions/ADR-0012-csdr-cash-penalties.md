@@ -57,6 +57,11 @@ no penalty domain yet, and `SecurityEvent` dropped the `:19A:` posting amount
 
 ## Starter limitations (tracked, not certified)
 
+> Amended by [ADR-0014](ADR-0014-per-transaction-events-and-signed-penalties.md).
+> Currency is now read from the `:19A:` ISO prefix rather than defaulted, and
+> recon keys on a real per-transaction reference rather than the message id. The
+> remaining limitations below stand.
+
 - Rate table values are representative defaults; real use needs the certified
   Annex rates + MiFID II liquidity classification per ISIN.
 - `business_days_failed` defaults to 1 (single-day accrual); real accrual counts

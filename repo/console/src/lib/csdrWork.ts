@@ -58,7 +58,10 @@ export function classifyBreak(line: CsdrReconLine, accrual?: CsdrAccrual): { rea
 
   // status === "break": both sides present, non-trivial diff.
   if (accrual && accrual.referenceAmount > 0 && accrual.penaltyRateBps > 0) {
-    const impliedBps = (line.reported / accrual.referenceAmount) * 10000;
+    // Rates are unsigned bps; compare against the reported *magnitude*, not
+    // the direction-signed amount, or a payable (negative) always looks like
+    // a wild rate mismatch against our (always positive) rate.
+    const impliedBps = (Math.abs(line.reported) / accrual.referenceAmount) * 10000;
     const ourBps = accrual.penaltyRateBps;
     if (Math.abs(impliedBps - ourBps) / ourBps > 0.05) {
       return {
@@ -134,7 +137,11 @@ export function netting(work: WorkLine[]): NettingCell[] {
     if (isBreak(w) && (w.disposition === "open" || w.disposition === "investigating")) cell.openBreaks += 1;
     cells.set(k, cell);
   }
-  return [...cells.values()].sort((a, b) => b.reported - a.reported);
+  // Biggest exposure first regardless of direction — `reported` is now
+  // direction-signed (payable negative, receivable positive), so sorting on
+  // the raw value would put the largest receivable first and the largest
+  // payable last instead of surfacing the largest position either way.
+  return [...cells.values()].sort((a, b) => Math.abs(b.reported) - Math.abs(a.reported));
 }
 
 // ---------------------------------------------------------------------------

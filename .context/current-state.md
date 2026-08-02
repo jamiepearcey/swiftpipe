@@ -39,6 +39,26 @@
 
 ## Recently completed work
 
+- **Review fixes on the CSDR/MT537 work (ADR-0014)**, all five verified against
+  the running pipeline rather than by inspection. `swift-normalize` now emits one
+  `SecurityEvent` **per transaction** instead of per message — an MT537 carrying
+  two pending transactions previously produced one accrual and silently dropped
+  the second. `SecurityEvent` gained `transaction_ref` (`:20C::RELA`, else
+  `:20C::SEME`), so penalty recon keys on the reference a CSD statement actually
+  uses; the CLI's filename-stem substitution is deleted. Settlement date is now
+  selected by qualifier `SETT` and no longer falls back to the `:98A::STAT//`
+  statement date (every fixture had been reporting the wrong ISD, the legal basis
+  for CSDR accrual). Currency is recovered from the `:19A:` ISO prefix instead of
+  defaulting to EUR on GBP messages. Penalty amounts are **direction-signed**
+  (payable negative, receivable positive) — `direction` was previously parsed,
+  persisted, and ignored, so receivables were summed as payables and an opposite-
+  direction pair netted to zero and reported as *matched*. `CsdrSnapshot::VERSION`
+  → 2 with a console version gate. Also: real CSV parsing for the CSD statement
+  (quoted fields containing commas shifted every later column), persisted
+  `business_days_failed`, and `PenaltyType` as the enum ADR-0012 specified.
+  **The external quant/pricing UI consumes `/csdr/snapshot` and needs the same
+  sign handling.** `cargo test --workspace` 466 tests, 0 failures (was 456);
+  clippy clean.
 - Added **anchored sequences** (ADR-0013): `swift-core` and `swift-schema`
   now support message types whose repeating field group has no `:16R:`/
   `:16S:` wrapper (a schema declares an `anchor_tag`/`member_tags` sequence).

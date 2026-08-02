@@ -92,7 +92,7 @@ fn read_penalty_accruals(conn: &Connection, store: &Path) -> Result<Vec<PenaltyA
     let mut q = conn.prepare(&format!(
         "SELECT source, transaction_ref, isin, instrument_desc, instrument_type, counterparty_bic, \
                 currency, quantity, reference_amount, penalty_type, penalty_rate_bps, status, \
-                intended_settlement_date, computed_amount, direction \
+                intended_settlement_date, business_days_failed, computed_amount, direction \
          FROM read_parquet('{path}')"
     ))?;
     let rows = q.query_map([], |r| {
@@ -110,9 +110,9 @@ fn read_penalty_accruals(conn: &Connection, store: &Path) -> Result<Vec<PenaltyA
             penalty_rate_bps: r.get::<_, f64>(10)?,
             status: r.get::<_, String>(11)?,
             intended_settlement_date: r.get::<_, Option<String>>(12)?,
-            business_days_failed: 1,
-            computed_amount: r.get::<_, f64>(13)?,
-            direction: r.get::<_, String>(14)?,
+            business_days_failed: r.get::<_, u32>(13)?,
+            computed_amount: r.get::<_, f64>(14)?,
+            direction: r.get::<_, String>(15)?,
         })
     })?;
     rows.map(|r| r.map_err(Into::into)).collect()

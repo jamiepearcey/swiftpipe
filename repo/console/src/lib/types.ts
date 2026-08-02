@@ -120,6 +120,13 @@ export interface ReconSnapshot {
 }
 
 // ---- CSDR penalty read-model (GET /csdr/snapshot) -------------------------
+// Contract version this console renders. v2 made every amount
+// direction-signed (payable → negative, receivable → positive) across
+// accrual/reported/recon-line/summary figures — see
+// `ingest-cli/src/csdr.rs::CsdrSnapshot::VERSION`. A snapshot at any other
+// version must not be rendered as if its amounts used this sign convention.
+export const CSDR_SNAPSHOT_VERSION = 2;
+
 export interface CsdrAccrual {
   source: string;
   transactionRef: string;

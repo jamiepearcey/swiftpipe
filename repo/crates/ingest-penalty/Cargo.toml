@@ -6,6 +6,7 @@ rust-version = "1.82"
 publish = false
 
 [dependencies]
+csv = "1"
 ingest-core = { path = "../ingest-core" }
 serde = { version = "1", features = ["derive"] }
 

@@ -232,17 +232,10 @@ fn run_store() -> Result<()> {
         match route {
             Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
             Route::PositionsCsv | Route::PositionsMt => {
-                let mut evs = parse_positions(route, &content, &schema_dir)?;
-                // Give each MT securities file a distinct transaction reference
-                // (its stem) instead of the placeholder id, so penalty accruals
-                // and recon keys are per-transaction rather than colliding.
-                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("mt");
-                for e in &mut evs {
-                    if e.message_id == "cli" {
-                        e.message_id = stem.to_string();
-                    }
-                }
-                events.extend(evs);
+                // `SecurityEvent::transaction_ref` (MT537 `:20C::RELA`, else
+                // `:20C::SEME`) is the real per-transaction reference penalty
+                // accruals and recon keys use — no filename scaffolding needed.
+                events.extend(parse_positions(route, &content, &schema_dir)?);
             }
         }
     }

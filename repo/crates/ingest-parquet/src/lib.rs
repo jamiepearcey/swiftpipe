@@ -11,7 +11,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use arrow::array::{ArrayRef, Float64Array, StringArray};
+use arrow::array::{ArrayRef, Float64Array, StringArray, UInt32Array};
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::error::ArrowError;
 use arrow::record_batch::RecordBatch;
@@ -25,6 +25,7 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
     let schema = Arc::new(Schema::new(vec![
         Field::new("source", DataType::Utf8, false),
         Field::new("message_id", DataType::Utf8, false),
+        Field::new("transaction_ref", DataType::Utf8, true),
         Field::new("message_type", DataType::Utf8, false),
         Field::new("kind", DataType::Utf8, false),
         Field::new("isin", DataType::Utf8, true),
@@ -38,6 +39,7 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
     let cols: Vec<ArrayRef> = vec![
         Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.source.as_str()))),
         Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.message_id.as_str()))),
+        Arc::new(StringArray::from_iter(events.iter().map(|e| e.transaction_ref.clone()))),
         Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.message_type.as_str()))),
         Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.kind.as_str()))),
         Arc::new(StringArray::from_iter(events.iter().map(|e| e.isin.clone()))),
@@ -136,6 +138,7 @@ pub fn penalty_accruals_batch(accruals: &[PenaltyAccrual]) -> Result<RecordBatch
         Field::new("penalty_rate_bps", DataType::Float64, false),
         Field::new("status", DataType::Utf8, false),
         Field::new("intended_settlement_date", DataType::Utf8, true),
+        Field::new("business_days_failed", DataType::UInt32, false),
         Field::new("computed_amount", DataType::Float64, false),
         Field::new("direction", DataType::Utf8, false),
     ]));
@@ -153,6 +156,7 @@ pub fn penalty_accruals_batch(accruals: &[PenaltyAccrual]) -> Result<RecordBatch
         Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.penalty_rate_bps))),
         Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.status.as_str()))),
         Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.intended_settlement_date.clone()))),
+        Arc::new(UInt32Array::from_iter_values(accruals.iter().map(|a| a.business_days_failed))),
         Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.computed_amount))),
         Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.direction.as_str()))),
     ];
@@ -265,7 +269,7 @@ mod tests {
         let batches = read_rows(&path);
         let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         assert_eq!(rows, 2);
-        assert_eq!(batches[0].num_columns(), 11);
+        assert_eq!(batches[0].num_columns(), 12);
     }
 
     #[test]

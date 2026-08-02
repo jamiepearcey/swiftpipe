@@ -11,6 +11,7 @@ import { Btn, Segmented } from "@/components/setup/kit";
 import { getCsdrSnapshot, type CsdrResult } from "@/lib/api";
 import { fmtAmount, fmtSigned, relTime } from "@/lib/format";
 import type { AppRoute } from "@/lib/route";
+import { CSDR_SNAPSHOT_VERSION } from "@/lib/types";
 import {
   buildWorkLines,
   derivePeriod,
@@ -148,6 +149,17 @@ export function Csdr({
       </Shell>
     );
   }
+  if (snapshot.version !== CSDR_SNAPSHOT_VERSION) {
+    return (
+      <Shell onRefresh={load}>
+        <PillarEmpty
+          icon={ShieldAlert}
+          title={`Unsupported CSDR snapshot version (v${snapshot.version})`}
+          body={`This console renders contract v${CSDR_SNAPSHOT_VERSION}, where amounts are direction-signed (payable negative, receivable positive). The read-model returned v${snapshot.version} — refusing to render, since the sign convention may differ and every figure on this screen would be misread. Upgrade the read-model or this console build.`}
+        />
+      </Shell>
+    );
+  }
 
   const s = snapshot.summary;
   const dispositioned = breaks.filter((w) => w.disposition !== "open").length;
@@ -189,13 +201,15 @@ export function Csdr({
         />
         <StatTile
           label="Reported"
-          value={fmtAmount(s.reportedTotal)}
+          value={
+            <span className={s.reportedTotal >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(s.reportedTotal)}</span>
+          }
           accent="regulatory"
-          sub={`computed ${fmtAmount(s.computedTotal)}`}
+          sub={`${s.reportedTotal >= 0 ? "receivable" : "payable"} · computed ${fmtSigned(s.computedTotal)} ${s.computedTotal >= 0 ? "receivable" : "payable"}`}
         />
         <StatTile
           label="Net difference"
-          value={<span className={s.netDiff >= 0 ? "text-debit" : "text-credit"}>{fmtSigned(s.netDiff)}</span>}
+          value={<span className={s.netDiff >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(s.netDiff)}</span>}
           accent="regulatory"
           sub={`${fmtAmount(s.breakAmount)} across breaks`}
         />
@@ -358,7 +372,7 @@ function BreakWork({
       header: "Diff",
       align: "right",
       mono: true,
-      render: (w) => <span className={w.line.diff >= 0 ? "text-debit" : "text-credit"}>{fmtSigned(w.line.diff)}</span>,
+      render: (w) => <span className={w.line.diff >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(w.line.diff)}</span>,
       sortValue: (w) => w.absDiff,
     },
     { key: "dispo", header: "State", render: (w) => <StatusBadge variant={DISPO_VARIANT[w.disposition]}>{w.disposition}</StatusBadge> },
@@ -436,7 +450,10 @@ function BreakInspector({ w, period, onOpenParser }: { w?: WorkLine; period: str
     );
   }
   const a = w.accrual;
-  const impliedBps = a && a.referenceAmount > 0 ? (w.line.reported / a.referenceAmount) * 10000 : null;
+  // Rates are unsigned bps; compare against the reported magnitude, not the
+  // direction-signed amount, or a payable (negative) always reads as a huge
+  // rate mismatch against our (always positive) rate.
+  const impliedBps = a && a.referenceAmount > 0 ? (Math.abs(w.line.reported) / a.referenceAmount) * 10000 : null;
   return (
     <aside className="w-[320px] shrink-0 space-y-3 overflow-auto rounded-lg border border-outline-subtle bg-surface-panel p-3">
       <div>
@@ -454,7 +471,7 @@ function BreakInspector({ w, period, onOpenParser }: { w?: WorkLine; period: str
       <Panel title="Computed vs reported">
         <Row label="Computed" value={`${w.line.currency} ${fmtAmount(w.line.computed)}`} />
         <Row label="Reported" value={`${w.line.currency} ${fmtAmount(w.line.reported)}`} />
-        <Row label="Diff" value={fmtSigned(w.line.diff)} tone={w.line.diff >= 0 ? "debit" : "credit"} />
+        <Row label="Diff" value={fmtSigned(w.line.diff)} tone={w.line.diff >= 0 ? "credit" : "debit"} />
       </Panel>
 
       {a && (
@@ -538,15 +555,39 @@ function NettingView({ cells }: { cells: ReturnType<typeof netting> }) {
   const columns: Column<(typeof cells)[number]>[] = [
     { key: "cp", header: "Counterparty", mono: true, render: (c) => c.counterparty },
     { key: "ccy", header: "Ccy", render: (c) => c.currency },
-    { key: "computed", header: "Computed", align: "right", mono: true, render: (c) => fmtAmount(c.computed), sortValue: (c) => c.computed },
-    { key: "reported", header: "Reported (CSD)", align: "right", mono: true, render: (c) => fmtAmount(c.reported), sortValue: (c) => c.reported },
+    {
+      key: "computed",
+      header: "Computed",
+      align: "right",
+      mono: true,
+      render: (c) => <span className={c.computed >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(c.computed)}</span>,
+      sortValue: (c) => c.computed,
+    },
+    {
+      key: "reported",
+      header: "Reported (CSD)",
+      align: "right",
+      mono: true,
+      render: (c) => <span className={c.reported >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(c.reported)}</span>,
+      sortValue: (c) => c.reported,
+    },
     {
       key: "adj",
       header: "If disputes upheld",
       align: "right",
       mono: true,
       render: (c) => (
-        <span className={c.disputeAdjusted !== c.reported ? "text-plane-regulatory" : ""}>{fmtAmount(c.disputeAdjusted)}</span>
+        <span
+          className={
+            c.disputeAdjusted !== c.reported
+              ? "font-medium text-plane-regulatory"
+              : c.disputeAdjusted >= 0
+                ? "text-credit"
+                : "text-debit"
+          }
+        >
+          {fmtSigned(c.disputeAdjusted)}
+        </span>
       ),
       sortValue: (c) => c.disputeAdjusted,
     },
@@ -555,15 +596,19 @@ function NettingView({ cells }: { cells: ReturnType<typeof netting> }) {
   return (
     <div className="space-y-2">
       <p className="text-[12px] text-muted-foreground">
-        Net penalty payable per counterparty per currency — reported by the CSD, and adjusted for the position if every
-        flagged dispute is upheld.
+        Net penalty position per counterparty per currency — negative is payable to the CSD, positive is receivable
+        from the CSD — reported by the CSD, and adjusted for the position if every flagged dispute is upheld.
       </p>
       <DataTable columns={columns} rows={cells} rowKey={(c) => `${c.counterparty}|${c.currency}`} empty="No penalties this period." dense />
       <div className="flex justify-end gap-8 rounded-lg border border-outline-subtle bg-surface-panel px-4 py-2 text-[12px]">
         <span className="text-muted-foreground">Totals</span>
-        <span className="font-mono tabular-nums">computed {fmtAmount(totals.computed)}</span>
-        <span className="font-mono tabular-nums">reported {fmtAmount(totals.reported)}</span>
-        <span className="font-mono tabular-nums text-plane-regulatory">if upheld {fmtAmount(totals.adj)}</span>
+        <span className={cn("font-mono tabular-nums", totals.computed >= 0 ? "text-credit" : "text-debit")}>
+          computed {fmtSigned(totals.computed)}
+        </span>
+        <span className={cn("font-mono tabular-nums", totals.reported >= 0 ? "text-credit" : "text-debit")}>
+          reported {fmtSigned(totals.reported)}
+        </span>
+        <span className="font-mono tabular-nums text-plane-regulatory">if upheld {fmtSigned(totals.adj)}</span>
       </div>
     </div>
   );
@@ -578,7 +623,7 @@ function AllLines({ work }: { work: WorkLine[] }) {
     { key: "type", header: "Type", render: (w) => w.line.penaltyType },
     { key: "computed", header: "Computed", align: "right", mono: true, render: (w) => fmtAmount(w.line.computed), sortValue: (w) => w.line.computed },
     { key: "reported", header: "Reported", align: "right", mono: true, render: (w) => fmtAmount(w.line.reported), sortValue: (w) => w.line.reported },
-    { key: "diff", header: "Diff", align: "right", mono: true, render: (w) => <span className={w.line.diff >= 0 ? "text-debit" : "text-credit"}>{fmtSigned(w.line.diff)}</span>, sortValue: (w) => w.absDiff },
+    { key: "diff", header: "Diff", align: "right", mono: true, render: (w) => <span className={w.line.diff >= 0 ? "text-credit" : "text-debit"}>{fmtSigned(w.line.diff)}</span>, sortValue: (w) => w.absDiff },
     { key: "status", header: "Status", render: (w) => <StatusBadge variant={STATUS_VARIANT[w.line.status] ?? "neutral"}>{w.line.status.replace("_", " ")}</StatusBadge> },
   ];
   return <DataTable columns={columns} rows={work} rowKey={(w) => w.key} empty="No penalties this period." dense />;
