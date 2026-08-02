@@ -27,12 +27,16 @@ struct AppState {
 }
 
 pub fn run_serve(store: PathBuf, bind: SocketAddr) -> Result<()> {
-    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
     rt.block_on(serve(store, bind))
 }
 
 async fn serve(store: PathBuf, bind: SocketAddr) -> Result<()> {
-    let state = Arc::new(AppState { store: store.clone() });
+    let state = Arc::new(AppState {
+        store: store.clone(),
+    });
     let app = Router::new()
         .route("/healthz", get(|| async { "ok" }))
         .route("/recon/snapshot", get(snapshot_handler))
@@ -41,7 +45,10 @@ async fn serve(store: PathBuf, bind: SocketAddr) -> Result<()> {
     let listener = tokio::net::TcpListener::bind(bind)
         .await
         .with_context(|| format!("binding {bind}"))?;
-    println!("recon read-model service on http://{bind}  (store: {})", store.display());
+    println!(
+        "recon read-model service on http://{bind}  (store: {})",
+        store.display()
+    );
     println!("  GET /recon/snapshot   GET /csdr/snapshot   GET /healthz");
     axum::serve(listener, app).await?;
     Ok(())
@@ -53,7 +60,11 @@ async fn snapshot_handler(State(state): State<Arc<AppState>>) -> impl IntoRespon
     match tokio::task::spawn_blocking(move || read_snapshot(&store)).await {
         Ok(Ok(snap)) => (StatusCode::OK, Json(snap)).into_response(),
         Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("join error: {e}"),
+        )
+            .into_response(),
     }
 }
 
@@ -71,7 +82,11 @@ async fn csdr_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match tokio::task::spawn_blocking(move || read_csdr_snapshot(&store)).await {
         Ok(Ok(snap)) => (StatusCode::OK, Json(snap)).into_response(),
         Ok(Err(e)) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{e:#}")).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("join error: {e}")).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("join error: {e}"),
+        )
+            .into_response(),
     }
 }
 
@@ -249,8 +264,16 @@ mod tests {
             message_type: "MT940".into(),
             account: Some("GB29".into()),
             currency: Some("EUR".into()),
-            opening_balance: Some(Balance { direction: Direction::Credit, amount: 100_000.0, ..Default::default() }),
-            closing_balance: Some(Balance { direction: Direction::Credit, amount: 120_000.0, ..Default::default() }),
+            opening_balance: Some(Balance {
+                direction: Direction::Credit,
+                amount: 100_000.0,
+                ..Default::default()
+            }),
+            closing_balance: Some(Balance {
+                direction: Direction::Credit,
+                amount: 120_000.0,
+                ..Default::default()
+            }),
             entries: vec![CashEntry {
                 value_date: Some("2026-05-13".into()),
                 direction: Direction::Credit,
@@ -271,9 +294,21 @@ mod tests {
             ..Default::default()
         };
 
-        ingest_parquet::write_cash_statements(std::slice::from_ref(&stmt), &store.join("cash_statements.parquet")).unwrap();
-        ingest_parquet::write_cash_entries(std::slice::from_ref(&stmt), &store.join("cash_entries.parquet")).unwrap();
-        ingest_parquet::write_security_events(std::slice::from_ref(&pos), &store.join("positions.parquet")).unwrap();
+        ingest_parquet::write_cash_statements(
+            std::slice::from_ref(&stmt),
+            &store.join("cash_statements.parquet"),
+        )
+        .unwrap();
+        ingest_parquet::write_cash_entries(
+            std::slice::from_ref(&stmt),
+            &store.join("cash_entries.parquet"),
+        )
+        .unwrap();
+        ingest_parquet::write_security_events(
+            std::slice::from_ref(&pos),
+            &store.join("positions.parquet"),
+        )
+        .unwrap();
 
         let snap = read_snapshot(store).unwrap();
         assert_eq!(snap.statements.len(), 1);

@@ -37,18 +37,40 @@ pub fn security_events_batch(events: &[SecurityEvent]) -> Result<RecordBatch, Ar
         Field::new("status", DataType::Utf8, true),
     ]));
     let cols: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.source.as_str()))),
-        Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.message_id.as_str()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.transaction_ref.clone()))),
-        Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.message_type.as_str()))),
-        Arc::new(StringArray::from_iter_values(events.iter().map(|e| e.kind.as_str()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.isin.clone()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.instrument_desc.clone()))),
+        Arc::new(StringArray::from_iter_values(
+            events.iter().map(|e| e.source.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            events.iter().map(|e| e.message_id.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.transaction_ref.clone()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            events.iter().map(|e| e.message_type.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            events.iter().map(|e| e.kind.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.isin.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.instrument_desc.clone()),
+        )),
         Arc::new(Float64Array::from_iter(events.iter().map(|e| e.quantity))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.settlement_date.clone()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.safekeeping_account.clone()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.party_bic.clone()))),
-        Arc::new(StringArray::from_iter(events.iter().map(|e| e.status.clone()))),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.settlement_date.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.safekeeping_account.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.party_bic.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            events.iter().map(|e| e.status.clone()),
+        )),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -69,13 +91,31 @@ pub fn cash_statements_batch(statements: &[CashStatement]) -> Result<RecordBatch
         Field::new("closing", DataType::Float64, true),
     ]));
     let cols: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.source.as_str()))),
-        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.message_id.as_str()))),
-        Arc::new(StringArray::from_iter_values(statements.iter().map(|s| s.message_type.as_str()))),
-        Arc::new(StringArray::from_iter(statements.iter().map(|s| s.account.clone()))),
-        Arc::new(StringArray::from_iter(statements.iter().map(|s| s.currency.clone()))),
-        Arc::new(Float64Array::from_iter(statements.iter().map(|s| s.opening_balance.as_ref().map(|b| b.signed())))),
-        Arc::new(Float64Array::from_iter(statements.iter().map(|s| s.closing_balance.as_ref().map(|b| b.signed())))),
+        Arc::new(StringArray::from_iter_values(
+            statements.iter().map(|s| s.source.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            statements.iter().map(|s| s.message_id.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            statements.iter().map(|s| s.message_type.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            statements.iter().map(|s| s.account.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            statements.iter().map(|s| s.currency.clone()),
+        )),
+        Arc::new(Float64Array::from_iter(
+            statements
+                .iter()
+                .map(|s| s.opening_balance.as_ref().map(|b| b.signed())),
+        )),
+        Arc::new(Float64Array::from_iter(
+            statements
+                .iter()
+                .map(|s| s.closing_balance.as_ref().map(|b| b.signed())),
+        )),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -105,19 +145,45 @@ pub fn cash_entries_batch(statements: &[CashStatement]) -> Result<RecordBatch, A
         Field::new("info", DataType::Utf8, true),
     ]));
     let cols: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from_iter_values(rows.iter().map(|(s, _)| s.source.as_str()))),
-        Arc::new(StringArray::from_iter_values(rows.iter().map(|(s, _)| s.message_id.as_str()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(s, _)| s.account.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(s, _)| s.currency.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.value_date.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.entry_date.clone()))),
-        Arc::new(StringArray::from_iter_values(rows.iter().map(|(_, e)| e.direction.as_str()))),
-        Arc::new(Float64Array::from_iter_values(rows.iter().map(|(_, e)| e.amount))),
-        Arc::new(Float64Array::from_iter_values(rows.iter().map(|(_, e)| e.signed_amount))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.transaction_type.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.customer_ref.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.bank_ref.clone()))),
-        Arc::new(StringArray::from_iter(rows.iter().map(|(_, e)| e.info.clone()))),
+        Arc::new(StringArray::from_iter_values(
+            rows.iter().map(|(s, _)| s.source.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            rows.iter().map(|(s, _)| s.message_id.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(s, _)| s.account.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(s, _)| s.currency.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.value_date.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.entry_date.clone()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            rows.iter().map(|(_, e)| e.direction.as_str()),
+        )),
+        Arc::new(Float64Array::from_iter_values(
+            rows.iter().map(|(_, e)| e.amount),
+        )),
+        Arc::new(Float64Array::from_iter_values(
+            rows.iter().map(|(_, e)| e.signed_amount),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.transaction_type.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.customer_ref.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.bank_ref.clone()),
+        )),
+        Arc::new(StringArray::from_iter(
+            rows.iter().map(|(_, e)| e.info.clone()),
+        )),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -143,22 +209,52 @@ pub fn penalty_accruals_batch(accruals: &[PenaltyAccrual]) -> Result<RecordBatch
         Field::new("direction", DataType::Utf8, false),
     ]));
     let cols: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.source.as_str()))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.transaction_ref.as_str()))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.isin.as_str()))),
-        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.instrument_desc.clone()))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.instrument_type.as_str()))),
-        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.counterparty_bic.clone()))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.currency.as_str()))),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.source.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.transaction_ref.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.isin.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            accruals.iter().map(|a| a.instrument_desc.clone()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.instrument_type.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            accruals.iter().map(|a| a.counterparty_bic.clone()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.currency.as_str()),
+        )),
         Arc::new(Float64Array::from_iter(accruals.iter().map(|a| a.quantity))),
-        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.reference_amount))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.penalty_type.as_str()))),
-        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.penalty_rate_bps))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.status.as_str()))),
-        Arc::new(StringArray::from_iter(accruals.iter().map(|a| a.intended_settlement_date.clone()))),
-        Arc::new(UInt32Array::from_iter_values(accruals.iter().map(|a| a.business_days_failed))),
-        Arc::new(Float64Array::from_iter_values(accruals.iter().map(|a| a.computed_amount))),
-        Arc::new(StringArray::from_iter_values(accruals.iter().map(|a| a.direction.as_str()))),
+        Arc::new(Float64Array::from_iter_values(
+            accruals.iter().map(|a| a.reference_amount),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.penalty_type.as_str()),
+        )),
+        Arc::new(Float64Array::from_iter_values(
+            accruals.iter().map(|a| a.penalty_rate_bps),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.status.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            accruals.iter().map(|a| a.intended_settlement_date.clone()),
+        )),
+        Arc::new(UInt32Array::from_iter_values(
+            accruals.iter().map(|a| a.business_days_failed),
+        )),
+        Arc::new(Float64Array::from_iter_values(
+            accruals.iter().map(|a| a.computed_amount),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            accruals.iter().map(|a| a.direction.as_str()),
+        )),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -177,15 +273,33 @@ pub fn penalty_statements_batch(reported: &[ReportedPenalty]) -> Result<RecordBa
         Field::new("direction", DataType::Utf8, false),
     ]));
     let cols: Vec<ArrayRef> = vec![
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.penalty_ref.as_str()))),
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.transaction_ref.as_str()))),
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.isin.as_str()))),
-        Arc::new(StringArray::from_iter(reported.iter().map(|r| r.counterparty_bic.clone()))),
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.currency.as_str()))),
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.penalty_type.as_str()))),
-        Arc::new(StringArray::from_iter(reported.iter().map(|r| r.period.clone()))),
-        Arc::new(Float64Array::from_iter_values(reported.iter().map(|r| r.reported_amount))),
-        Arc::new(StringArray::from_iter_values(reported.iter().map(|r| r.direction.as_str()))),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.penalty_ref.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.transaction_ref.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.isin.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            reported.iter().map(|r| r.counterparty_bic.clone()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.currency.as_str()),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.penalty_type.as_str()),
+        )),
+        Arc::new(StringArray::from_iter(
+            reported.iter().map(|r| r.period.clone()),
+        )),
+        Arc::new(Float64Array::from_iter_values(
+            reported.iter().map(|r| r.reported_amount),
+        )),
+        Arc::new(StringArray::from_iter_values(
+            reported.iter().map(|r| r.direction.as_str()),
+        )),
     ];
     RecordBatch::try_new(schema, cols)
 }
@@ -280,11 +394,29 @@ mod tests {
             message_type: "MT940".into(),
             account: Some("GB29...".into()),
             currency: Some("EUR".into()),
-            opening_balance: Some(Balance { amount: 100000.0, ..Default::default() }),
-            closing_balance: Some(Balance { amount: 120000.0, ..Default::default() }),
+            opening_balance: Some(Balance {
+                amount: 100000.0,
+                ..Default::default()
+            }),
+            closing_balance: Some(Balance {
+                amount: 120000.0,
+                ..Default::default()
+            }),
             entries: vec![
-                CashEntry { direction: Direction::Credit, amount: 25000.0, signed_amount: 25000.0, transaction_type: Some("TRF".into()), ..Default::default() },
-                CashEntry { direction: Direction::Debit, amount: 5000.0, signed_amount: -5000.0, transaction_type: Some("CHG".into()), ..Default::default() },
+                CashEntry {
+                    direction: Direction::Credit,
+                    amount: 25000.0,
+                    signed_amount: 25000.0,
+                    transaction_type: Some("TRF".into()),
+                    ..Default::default()
+                },
+                CashEntry {
+                    direction: Direction::Debit,
+                    amount: 5000.0,
+                    signed_amount: -5000.0,
+                    transaction_type: Some("CHG".into()),
+                    ..Default::default()
+                },
             ],
             ..Default::default()
         };
@@ -306,8 +438,16 @@ mod tests {
             message_type: "MT940".into(),
             account: Some("GB29...".into()),
             currency: Some("EUR".into()),
-            opening_balance: Some(Balance { direction: Direction::Credit, amount: 100000.0, ..Default::default() }),
-            closing_balance: Some(Balance { direction: Direction::Credit, amount: 120000.0, ..Default::default() }),
+            opening_balance: Some(Balance {
+                direction: Direction::Credit,
+                amount: 100000.0,
+                ..Default::default()
+            }),
+            closing_balance: Some(Balance {
+                direction: Direction::Credit,
+                amount: 120000.0,
+                ..Default::default()
+            }),
             ..Default::default()
         };
         let dir = tempfile::tempdir().unwrap();

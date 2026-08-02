@@ -3781,11 +3781,23 @@ messages:
 
         let raw = b"{4:\n:20:STMT1\n:61:LINE1\n:86:Narrative one\n:61:LINE2\n:86:Narrative two\n:62F:CLOSE\n-}";
         let parsed = swift_core::parse_message_with_sequences(raw, &anchored);
-        assert!(parsed.diagnostics.is_empty(), "diagnostics: {:?}", parsed.diagnostics);
+        assert!(
+            parsed.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            parsed.diagnostics
+        );
 
         let matched = match_and_parse_message(&catalog, schema, &parsed);
-        assert!(matched.missing_required.is_empty(), "{:?}", matched.missing_required);
-        assert!(matched.parse_errors.is_empty(), "{:?}", matched.parse_errors);
+        assert!(
+            matched.missing_required.is_empty(),
+            "{:?}",
+            matched.missing_required
+        );
+        assert!(
+            matched.parse_errors.is_empty(),
+            "{:?}",
+            matched.parse_errors
+        );
 
         // Each entry's :61: and :86: share one scope; the two entries are distinct.
         let scopes: Vec<Option<String>> = matched
@@ -3796,12 +3808,12 @@ messages:
         assert_eq!(
             scopes,
             vec![
-                None,                        // :20:
+                None,                         // :20:
                 Some("ENTRY[0]".to_string()), // :61: line 1
                 Some("ENTRY[0]".to_string()), // :86: narrative 1 — same scope
                 Some("ENTRY[1]".to_string()), // :61: line 2
                 Some("ENTRY[1]".to_string()), // :86: narrative 2 — same scope
-                None,                        // :62F:
+                None,                         // :62F:
             ]
         );
     }
@@ -3840,7 +3852,10 @@ messages:
         );
         // Fields appear in wire order, byte-exact, with no extra markers.
         let block4_line_count = rendered.lines().filter(|l| l.starts_with(':')).count();
-        assert_eq!(block4_line_count, 6, "exactly the 6 data lines, no wrapper lines:\n{rendered}");
+        assert_eq!(
+            block4_line_count, 6,
+            "exactly the 6 data lines, no wrapper lines:\n{rendered}"
+        );
         assert!(rendered.contains(":61:LINE1\n"));
         assert!(rendered.contains(":86:Narrative one\n"));
         assert!(rendered.contains(":61:LINE2\n"));

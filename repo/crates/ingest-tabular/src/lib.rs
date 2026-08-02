@@ -28,11 +28,26 @@ impl SecuritySource for TabularSource {
 pub fn parse_csv(csv: &str) -> Vec<SecurityEvent> {
     let mut rows = csv.lines().filter(|l| !l.trim().is_empty());
     let header: Vec<String> = match rows.next() {
-        Some(h) => h.split(',').map(|c| c.trim().to_ascii_lowercase()).collect(),
+        Some(h) => h
+            .split(',')
+            .map(|c| c.trim().to_ascii_lowercase())
+            .collect(),
         None => return Vec::new(),
     };
     let idx = |name: &str| header.iter().position(|h| h == name);
-    let (i_isin, i_qty, i_acct, i_date, i_party, i_id, i_desc, i_status, i_amount, i_ccy, i_txn_ref) = (
+    let (
+        i_isin,
+        i_qty,
+        i_acct,
+        i_date,
+        i_party,
+        i_id,
+        i_desc,
+        i_status,
+        i_amount,
+        i_ccy,
+        i_txn_ref,
+    ) = (
         idx("isin"),
         idx("quantity"),
         idx("account"),

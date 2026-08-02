@@ -417,24 +417,32 @@ fn push_field<'a>(
     // Anchored ("implicit") sequences — root scope only, no 16R/16S wrapper.
     // The anchor tag starts (or restarts) an occurrence; declared member tags
     // stay inside it; any other tag closes it. See `AnchoredSequence`.
-    let anchor_frame: Option<SequenceFrame<'a>> = if sequence_stack.is_empty() && !anchored.is_empty() {
-        if let Some(idx) = anchored.iter().position(|a| a.anchor_tag == tag) {
-            let occurrence = next_sequence_occurrence(sequence_stack, anchored[idx].name, sequence_counts);
-            *open_anchor = Some((idx, occurrence));
-            Some(SequenceFrame { name: anchored[idx].name, occurrence })
-        } else if let Some((idx, occurrence)) = *open_anchor {
-            if anchored[idx].member_tags.contains(&tag) {
-                Some(SequenceFrame { name: anchored[idx].name, occurrence })
+    let anchor_frame: Option<SequenceFrame<'a>> =
+        if sequence_stack.is_empty() && !anchored.is_empty() {
+            if let Some(idx) = anchored.iter().position(|a| a.anchor_tag == tag) {
+                let occurrence =
+                    next_sequence_occurrence(sequence_stack, anchored[idx].name, sequence_counts);
+                *open_anchor = Some((idx, occurrence));
+                Some(SequenceFrame {
+                    name: anchored[idx].name,
+                    occurrence,
+                })
+            } else if let Some((idx, occurrence)) = *open_anchor {
+                if anchored[idx].member_tags.contains(&tag) {
+                    Some(SequenceFrame {
+                        name: anchored[idx].name,
+                        occurrence,
+                    })
+                } else {
+                    *open_anchor = None;
+                    None
+                }
             } else {
-                *open_anchor = None;
                 None
             }
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
     let sequence_path = match anchor_frame {
         Some(frame) => {
@@ -972,7 +980,11 @@ SECOND LINE
                         :61:2605130513D5000,00NCHGCUST-B//BANKREF-B\n:86:Custody fee\n\
                         :62F:C260513EUR120000,00\n:64:C260513EUR120000,00\n-}";
         let parsed = parse_message_with_sequences(message, &[mt940_anchor()]);
-        assert!(parsed.diagnostics.is_empty(), "diagnostics: {:?}", parsed.diagnostics);
+        assert!(
+            parsed.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            parsed.diagnostics
+        );
 
         let by_tag_and_path: Vec<(&str, &[u8], Option<u32>)> = parsed
             .fields
@@ -1036,7 +1048,11 @@ SECOND LINE
                         :16R:LINK\n:20C::RELA//REL1\n:16S:LINK\n\
                         :86:Trailer narrative\n-}";
         let parsed = parse_message_with_sequences(message, &[mt940_anchor()]);
-        assert!(parsed.diagnostics.is_empty(), "diagnostics: {:?}", parsed.diagnostics);
+        assert!(
+            parsed.diagnostics.is_empty(),
+            "diagnostics: {:?}",
+            parsed.diagnostics
+        );
 
         let trailer = parsed.fields.last().expect("trailer field present");
         assert_eq!(trailer.tag, b"86");

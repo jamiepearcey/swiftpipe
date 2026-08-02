@@ -83,19 +83,35 @@ fn parse_stmt(stmt: Node, prefix: &str, idx: usize) -> CashStatement {
 fn parse_balance(bal: Node) -> (String, Balance) {
     let code = text(bal, "Cd").unwrap_or_default();
     let amt = find(bal, "Amt");
-    let amount = amt.and_then(|n| n.text()).and_then(|t| t.trim().parse::<f64>().ok()).unwrap_or(0.0);
+    let amount = amt
+        .and_then(|n| n.text())
+        .and_then(|t| t.trim().parse::<f64>().ok())
+        .unwrap_or(0.0);
     let currency = amt.and_then(|n| n.attribute("Ccy")).map(str::to_string);
     let direction = match text(bal, "CdtDbtInd").as_deref() {
         Some("DBIT") => Direction::Debit,
         _ => Direction::Credit,
     };
-    let date = find(bal, "Dt").and_then(|d| text(d, "Dt")).or_else(|| text(bal, "Dt"));
-    (code, Balance { direction, date, currency, amount })
+    let date = find(bal, "Dt")
+        .and_then(|d| text(d, "Dt"))
+        .or_else(|| text(bal, "Dt"));
+    (
+        code,
+        Balance {
+            direction,
+            date,
+            currency,
+            amount,
+        },
+    )
 }
 
 fn parse_entry(ntry: Node) -> CashEntry {
     let amt = find(ntry, "Amt");
-    let amount = amt.and_then(|n| n.text()).and_then(|t| t.trim().parse::<f64>().ok()).unwrap_or(0.0);
+    let amount = amt
+        .and_then(|n| n.text())
+        .and_then(|t| t.trim().parse::<f64>().ok())
+        .unwrap_or(0.0);
     let base = match text(ntry, "CdtDbtInd").as_deref() {
         Some("DBIT") => Direction::Debit,
         _ => Direction::Credit,

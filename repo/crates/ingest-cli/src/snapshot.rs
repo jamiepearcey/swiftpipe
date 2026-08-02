@@ -76,8 +76,15 @@ impl ReconSnapshot {
 
     /// Assemble from already-flattened parts — the read-model service builds
     /// these straight from a DuckDB query over the Parquet store.
-    pub fn from_parts(statements: Vec<SnapshotStatement>, positions: Vec<SnapshotPosition>) -> Self {
-        ReconSnapshot { version: Self::VERSION, statements, positions }
+    pub fn from_parts(
+        statements: Vec<SnapshotStatement>,
+        positions: Vec<SnapshotPosition>,
+    ) -> Self {
+        ReconSnapshot {
+            version: Self::VERSION,
+            statements,
+            positions,
+        }
     }
 }
 
@@ -88,15 +95,27 @@ fn map_statement(s: &CashStatement) -> SnapshotStatement {
         message_type: s.message_type.clone(),
         account: s.account.clone().unwrap_or_default(),
         currency: s.currency.clone().unwrap_or_default(),
-        opening: s.opening_balance.as_ref().map(|b| b.signed()).unwrap_or(0.0),
-        closing: s.closing_balance.as_ref().map(|b| b.signed()).unwrap_or(0.0),
+        opening: s
+            .opening_balance
+            .as_ref()
+            .map(|b| b.signed())
+            .unwrap_or(0.0),
+        closing: s
+            .closing_balance
+            .as_ref()
+            .map(|b| b.signed())
+            .unwrap_or(0.0),
         entries: s.entries.iter().map(map_entry).collect(),
     }
 }
 
 fn map_entry(e: &ingest_core::CashEntry) -> SnapshotEntry {
     SnapshotEntry {
-        value_date: e.value_date.clone().or_else(|| e.entry_date.clone()).unwrap_or_default(),
+        value_date: e
+            .value_date
+            .clone()
+            .or_else(|| e.entry_date.clone())
+            .unwrap_or_default(),
         direction: e.direction.as_str().to_string(),
         amount: e.amount,
         signed_amount: e.signed_amount,
@@ -125,7 +144,12 @@ mod tests {
     use ingest_core::{Balance, CashEntry, Direction, EventKind};
 
     fn bal(dir: Direction, amount: f64) -> Balance {
-        Balance { direction: dir, date: None, currency: Some("EUR".into()), amount }
+        Balance {
+            direction: dir,
+            date: None,
+            currency: Some("EUR".into()),
+            amount,
+        }
     }
 
     #[test]
@@ -173,7 +197,10 @@ mod tests {
             quantity: Some(1000.0),
             ..Default::default()
         };
-        let without = SecurityEvent { source: "swift".into(), ..Default::default() };
+        let without = SecurityEvent {
+            source: "swift".into(),
+            ..Default::default()
+        };
         let snap = ReconSnapshot::build(&[], &[with, without]);
         assert_eq!(snap.positions.len(), 1);
         assert_eq!(snap.positions[0].isin, "GB00B03MLX29");

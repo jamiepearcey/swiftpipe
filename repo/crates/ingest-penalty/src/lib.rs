@@ -118,7 +118,17 @@ impl PenaltyRateTable {
 /// reference data (issuer type), not the ISIN string.
 pub fn classify_instrument(desc: Option<&str>) -> InstrumentType {
     let d = desc.unwrap_or("").to_ascii_uppercase();
-    let sovereign = ["GILT", "TREASURY", "TREAS", "BUND", "BTP", "OAT", "GOVT", "SOVEREIGN", "T-BILL"];
+    let sovereign = [
+        "GILT",
+        "TREASURY",
+        "TREAS",
+        "BUND",
+        "BTP",
+        "OAT",
+        "GOVT",
+        "SOVEREIGN",
+        "T-BILL",
+    ];
     if sovereign.iter().any(|k| d.contains(k)) {
         return InstrumentType::SovereignBond;
     }
@@ -279,12 +289,18 @@ pub fn compute_penalty_accruals(
                 source: e.source.clone(),
                 // The per-transaction reference, not the message id — a
                 // single MT537 message can carry many failing transactions.
-                transaction_ref: e.transaction_ref.clone().unwrap_or_else(|| e.message_id.clone()),
+                transaction_ref: e
+                    .transaction_ref
+                    .clone()
+                    .unwrap_or_else(|| e.message_id.clone()),
                 isin,
                 instrument_desc: e.instrument_desc.clone(),
                 instrument_type: itype.as_str().to_string(),
                 counterparty_bic: e.party_bic.clone(),
-                currency: e.currency.clone().unwrap_or_else(|| default_currency.to_string()),
+                currency: e
+                    .currency
+                    .clone()
+                    .unwrap_or_else(|| default_currency.to_string()),
                 quantity: e.quantity,
                 reference_amount: amount,
                 penalty_type: PenaltyType::Sefp.as_str().to_string(),
@@ -335,11 +351,15 @@ pub fn parse_penalty_statement_csv(csv_text: &str) -> Vec<ReportedPenalty> {
         .filter_map(|record| {
             let record = record.ok()?;
             let get = |i: Option<usize>| {
-                i.and_then(|i| record.get(i)).map(str::to_string).filter(|s| !s.is_empty())
+                i.and_then(|i| record.get(i))
+                    .map(str::to_string)
+                    .filter(|s| !s.is_empty())
             };
             let amount = get(i_amt)?.parse::<f64>().ok()?;
             let direction = get(i_dir).unwrap_or_else(|| "payable".to_string());
-            let penalty_type = get(i_type).and_then(|s| PenaltyType::parse(&s)).unwrap_or_default();
+            let penalty_type = get(i_type)
+                .and_then(|s| PenaltyType::parse(&s))
+                .unwrap_or_default();
             Some(ReportedPenalty {
                 penalty_ref: get(i_ref).unwrap_or_default(),
                 transaction_ref: get(i_txn).unwrap_or_default(),
@@ -478,7 +498,10 @@ pub fn reconcile_penalties(
     for (key, (c, r)) in sides {
         let computed_amount = c.as_ref().map(|s| s.amount).unwrap_or(0.0);
         let reported_amount = r.as_ref().map(|s| s.amount).unwrap_or(0.0);
-        let repr = c.as_ref().or(r.as_ref()).expect("at least one side present");
+        let repr = c
+            .as_ref()
+            .or(r.as_ref())
+            .expect("at least one side present");
         let diff = round2(reported_amount - computed_amount);
         let status = match (&c, &r) {
             (Some(_), Some(_)) if diff.abs() <= RECON_TOLERANCE => "matched",
@@ -548,9 +571,18 @@ mod tests {
 
     #[test]
     fn classifies_and_rates_instruments() {
-        assert_eq!(classify_instrument(Some("ACME PLC ORD")), InstrumentType::LiquidShare);
-        assert_eq!(classify_instrument(Some("UK GILT 4% 2030")), InstrumentType::SovereignBond);
-        assert_eq!(classify_instrument(Some("ACME 5% 2028 BOND")), InstrumentType::CorporateBond);
+        assert_eq!(
+            classify_instrument(Some("ACME PLC ORD")),
+            InstrumentType::LiquidShare
+        );
+        assert_eq!(
+            classify_instrument(Some("UK GILT 4% 2030")),
+            InstrumentType::SovereignBond
+        );
+        assert_eq!(
+            classify_instrument(Some("ACME 5% 2028 BOND")),
+            InstrumentType::CorporateBond
+        );
         let t = PenaltyRateTable::starter();
         assert_eq!(t.rate_bps(InstrumentType::LiquidShare), 1.0);
         assert_eq!(t.rate_bps(InstrumentType::SovereignBond), 0.10);
@@ -560,13 +592,26 @@ mod tests {
     fn only_failing_events_with_amount_accrue() {
         let events = vec![
             failing_event(12_345.67, "ACME PLC ORD"),
-            SecurityEvent { status: Some("FUTU".into()), amount: Some(1000.0), isin: Some("X".into()), ..Default::default() },
-            SecurityEvent { kind: EventKind::Holding, isin: Some("Y".into()), quantity: Some(10.0), ..Default::default() },
+            SecurityEvent {
+                status: Some("FUTU".into()),
+                amount: Some(1000.0),
+                isin: Some("X".into()),
+                ..Default::default()
+            },
+            SecurityEvent {
+                kind: EventKind::Holding,
+                isin: Some("Y".into()),
+                quantity: Some(10.0),
+                ..Default::default()
+            },
         ];
         let acc = compute_penalty_accruals(&events, &PenaltyRateTable::starter(), "GBP");
         assert_eq!(acc.len(), 1, "only the PEND event with an amount accrues");
         let a = &acc[0];
-        assert_eq!(a.transaction_ref, "RELREF1", "the per-transaction reference, not the message id");
+        assert_eq!(
+            a.transaction_ref, "RELREF1",
+            "the per-transaction reference, not the message id"
+        );
         assert_eq!(a.instrument_type, "liquid_share");
         assert_eq!(a.penalty_rate_bps, 1.0);
         assert_eq!(a.reference_amount, 12_345.67);
@@ -604,14 +649,54 @@ mod tests {
     #[test]
     fn reconcile_matches_breaks_and_missing() {
         let computed = vec![
-            PenaltyAccrual { transaction_ref: "T1".into(), isin: "AAA".into(), penalty_type: "SEFP".into(), computed_amount: -10.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
-            PenaltyAccrual { transaction_ref: "T2".into(), isin: "BBB".into(), penalty_type: "SEFP".into(), computed_amount: -5.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
+            PenaltyAccrual {
+                transaction_ref: "T1".into(),
+                isin: "AAA".into(),
+                penalty_type: "SEFP".into(),
+                computed_amount: -10.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
+            PenaltyAccrual {
+                transaction_ref: "T2".into(),
+                isin: "BBB".into(),
+                penalty_type: "SEFP".into(),
+                computed_amount: -5.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
         ];
         let reported = vec![
             // T1 matches exactly, T2 differs by 0.50 (a break), T3 only reported (missing_computed)
-            ReportedPenalty { transaction_ref: "T1".into(), isin: "AAA".into(), penalty_type: "SEFP".into(), reported_amount: -10.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
-            ReportedPenalty { transaction_ref: "T2".into(), isin: "BBB".into(), penalty_type: "SEFP".into(), reported_amount: -5.50, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
-            ReportedPenalty { transaction_ref: "T3".into(), isin: "CCC".into(), penalty_type: "SEFP".into(), reported_amount: -3.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
+            ReportedPenalty {
+                transaction_ref: "T1".into(),
+                isin: "AAA".into(),
+                penalty_type: "SEFP".into(),
+                reported_amount: -10.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
+            ReportedPenalty {
+                transaction_ref: "T2".into(),
+                isin: "BBB".into(),
+                penalty_type: "SEFP".into(),
+                reported_amount: -5.50,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
+            ReportedPenalty {
+                transaction_ref: "T3".into(),
+                isin: "CCC".into(),
+                penalty_type: "SEFP".into(),
+                reported_amount: -3.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
         ];
         let (lines, sum) = reconcile_penalties(&computed, &reported);
         assert_eq!(lines.len(), 3);
@@ -655,21 +740,59 @@ mod tests {
         assert_eq!(lines[0].status, "break");
         assert_eq!(sum.matched, 0);
         assert_eq!(sum.breaks, 1);
-        assert_eq!(sum.net_diff, 20.00, "reported (+10) - computed (-10) = 20, the true swing");
+        assert_eq!(
+            sum.net_diff, 20.00,
+            "reported (+10) - computed (-10) = 20, the true swing"
+        );
     }
 
     #[test]
     fn reconcile_nets_mixed_directions_in_the_summary_totals() {
         let computed = vec![
-            PenaltyAccrual { transaction_ref: "T1".into(), isin: "AAA".into(), penalty_type: "SEFP".into(), computed_amount: -10.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
-            PenaltyAccrual { transaction_ref: "T2".into(), isin: "BBB".into(), penalty_type: "SEFP".into(), computed_amount: 4.00, direction: "receivable".into(), currency: "EUR".into(), ..Default::default() },
+            PenaltyAccrual {
+                transaction_ref: "T1".into(),
+                isin: "AAA".into(),
+                penalty_type: "SEFP".into(),
+                computed_amount: -10.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
+            PenaltyAccrual {
+                transaction_ref: "T2".into(),
+                isin: "BBB".into(),
+                penalty_type: "SEFP".into(),
+                computed_amount: 4.00,
+                direction: "receivable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
         ];
         let reported = vec![
-            ReportedPenalty { transaction_ref: "T1".into(), isin: "AAA".into(), penalty_type: "SEFP".into(), reported_amount: -10.00, direction: "payable".into(), currency: "EUR".into(), ..Default::default() },
-            ReportedPenalty { transaction_ref: "T2".into(), isin: "BBB".into(), penalty_type: "SEFP".into(), reported_amount: 4.00, direction: "receivable".into(), currency: "EUR".into(), ..Default::default() },
+            ReportedPenalty {
+                transaction_ref: "T1".into(),
+                isin: "AAA".into(),
+                penalty_type: "SEFP".into(),
+                reported_amount: -10.00,
+                direction: "payable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
+            ReportedPenalty {
+                transaction_ref: "T2".into(),
+                isin: "BBB".into(),
+                penalty_type: "SEFP".into(),
+                reported_amount: 4.00,
+                direction: "receivable".into(),
+                currency: "EUR".into(),
+                ..Default::default()
+            },
         ];
         let (_, sum) = reconcile_penalties(&computed, &reported);
-        assert_eq!(sum.computed_total, -6.00, "net position: -10 payable + 4 receivable");
+        assert_eq!(
+            sum.computed_total, -6.00,
+            "net position: -10 payable + 4 receivable"
+        );
         assert_eq!(sum.reported_total, -6.00);
         assert_eq!(sum.net_diff, 0.0);
         assert_eq!(sum.matched, 2);
@@ -678,7 +801,8 @@ mod tests {
 
     #[test]
     fn parses_penalty_statement_csv() {
-        let csv = "penalty_ref,transaction_ref,isin,counterparty,currency,penalty_type,amount,period\n\
+        let csv =
+            "penalty_ref,transaction_ref,isin,counterparty,currency,penalty_type,amount,period\n\
                    PEN1,MT537REF1,GB00B03MLX29,BANKGB22,GBP,SEFP,1.23,2026-05\n";
         let r = parse_penalty_statement_csv(csv);
         assert_eq!(r.len(), 1);
@@ -708,8 +832,14 @@ mod tests {
                    PEN9,REF9,GB00B03MLX29,\"Big Bank, London Branch\",GBP,SEFP,3.45,2026-05,payable\n";
         let r = parse_penalty_statement_csv(csv);
         assert_eq!(r.len(), 1);
-        assert_eq!(r[0].counterparty_bic.as_deref(), Some("Big Bank, London Branch"));
-        assert_eq!(r[0].currency, "GBP", "the comma inside the quoted field must not shift later columns");
+        assert_eq!(
+            r[0].counterparty_bic.as_deref(),
+            Some("Big Bank, London Branch")
+        );
+        assert_eq!(
+            r[0].currency, "GBP",
+            "the comma inside the quoted field must not shift later columns"
+        );
         assert_eq!(r[0].reported_amount, -3.45);
     }
 
@@ -730,17 +860,31 @@ mod tests {
         let fin = include_str!("../../../examples/mt537_sample.fin");
         let schema = include_str!("../../../examples/schemas/mt537.yaml");
         let catalog = SchemaCatalog::from_yaml_str(schema).expect("load mt537 schema");
-        let inbound = InboundMessage { id: "MT537REF1".into(), message_type: "MT537".into(), body: fin.into() };
+        let inbound = InboundMessage {
+            id: "MT537REF1".into(),
+            message_type: "MT537".into(),
+            body: fin.into(),
+        };
         let parsed = parse_message(inbound.body.as_bytes());
         let batch = materialize_message(&catalog, &inbound, &parsed).expect("materialize");
         let events = swift_normalize::normalize(&batch);
 
         let accruals = compute_penalty_accruals(&events, &PenaltyRateTable::starter(), "GBP");
-        assert_eq!(accruals.len(), 1, "the MT537 pending transaction accrues one penalty");
+        assert_eq!(
+            accruals.len(),
+            1,
+            "the MT537 pending transaction accrues one penalty"
+        );
         let a = &accruals[0];
-        assert_eq!(a.transaction_ref, "RELREF1", "the :20C::RELA transaction-scope reference, not the message id");
+        assert_eq!(
+            a.transaction_ref, "RELREF1",
+            "the :20C::RELA transaction-scope reference, not the message id"
+        );
         assert_eq!(a.isin, "GB00B03MLX29");
-        assert_eq!(a.reference_amount, 12_345.67, "the :19A::PSTA posting amount is the penalty base");
+        assert_eq!(
+            a.reference_amount, 12_345.67,
+            "the :19A::PSTA posting amount is the penalty base"
+        );
         assert_eq!(a.status, "PEND");
         assert_eq!(a.penalty_type, "SEFP");
         // liquid share 1.0 bps of 12,345.67 = 1.23, payable → negative.
@@ -760,23 +904,46 @@ mod tests {
         let fin = include_str!("../../../examples/mt537_two_fails.fin");
         let schema = include_str!("../../../examples/schemas/mt537.yaml");
         let catalog = SchemaCatalog::from_yaml_str(schema).expect("load mt537 schema");
-        let inbound = InboundMessage { id: "MT537TWOF".into(), message_type: "MT537".into(), body: fin.into() };
+        let inbound = InboundMessage {
+            id: "MT537TWOF".into(),
+            message_type: "MT537".into(),
+            body: fin.into(),
+        };
         let parsed = parse_message(inbound.body.as_bytes());
         let batch = materialize_message(&catalog, &inbound, &parsed).expect("materialize");
         let events = swift_normalize::normalize(&batch);
 
         let accruals = compute_penalty_accruals(&events, &PenaltyRateTable::starter(), "GBP");
-        assert_eq!(accruals.len(), 2, "two pending transactions in one MT537 message accrue two penalties");
+        assert_eq!(
+            accruals.len(),
+            2,
+            "two pending transactions in one MT537 message accrue two penalties"
+        );
 
-        let gilt = accruals.iter().find(|a| a.isin == "GB00BBJNQY21").expect("gilt accrual");
-        let bond = accruals.iter().find(|a| a.isin == "XS2000000001").expect("bond accrual");
+        let gilt = accruals
+            .iter()
+            .find(|a| a.isin == "GB00BBJNQY21")
+            .expect("gilt accrual");
+        let bond = accruals
+            .iter()
+            .find(|a| a.isin == "XS2000000001")
+            .expect("bond accrual");
 
-        assert_ne!(gilt.transaction_ref, bond.transaction_ref, "each transaction keeps its own reference");
+        assert_ne!(
+            gilt.transaction_ref, bond.transaction_ref,
+            "each transaction keeps its own reference"
+        );
         assert_eq!(gilt.transaction_ref, "RELONE");
         assert_eq!(bond.transaction_ref, "RELTWO");
 
-        assert_eq!(gilt.instrument_type, "sovereign_bond", "UK GILT description classifies as sovereign");
-        assert_eq!(bond.instrument_type, "corporate_bond", "% coupon bond description classifies as corporate");
+        assert_eq!(
+            gilt.instrument_type, "sovereign_bond",
+            "UK GILT description classifies as sovereign"
+        );
+        assert_eq!(
+            bond.instrument_type, "corporate_bond",
+            "% coupon bond description classifies as corporate"
+        );
 
         assert_eq!(gilt.reference_amount, 5_000_000.00);
         assert_eq!(bond.reference_amount, 2_000_000.00);

@@ -107,9 +107,18 @@ mod tests {
     #[test]
     fn cash_pnl_splits_income_and_charges() {
         let stmt = CashStatement {
-            opening_balance: Some(Balance { amount: 100000.0, ..Default::default() }),
-            closing_balance: Some(Balance { amount: 120000.0, ..Default::default() }),
-            entries: vec![entry(Direction::Credit, 25000.0, "DIV"), entry(Direction::Debit, 5000.0, "CHG")],
+            opening_balance: Some(Balance {
+                amount: 100000.0,
+                ..Default::default()
+            }),
+            closing_balance: Some(Balance {
+                amount: 120000.0,
+                ..Default::default()
+            }),
+            entries: vec![
+                entry(Direction::Credit, 25000.0, "DIV"),
+                entry(Direction::Debit, 5000.0, "CHG"),
+            ],
             ..Default::default()
         };
         let p = compute_cash_pnl(std::slice::from_ref(&stmt));
@@ -124,9 +133,24 @@ mod tests {
     #[test]
     fn positions_snapshot_aggregates_by_isin() {
         let events = vec![
-            SecurityEvent { kind: EventKind::Holding, isin: Some("GB00B03MLX29".into()), quantity: Some(1000.0), ..Default::default() },
-            SecurityEvent { kind: EventKind::Holding, isin: Some("GB00B03MLX29".into()), quantity: Some(500.0), ..Default::default() },
-            SecurityEvent { kind: EventKind::Holding, isin: None, quantity: Some(10.0), ..Default::default() },
+            SecurityEvent {
+                kind: EventKind::Holding,
+                isin: Some("GB00B03MLX29".into()),
+                quantity: Some(1000.0),
+                ..Default::default()
+            },
+            SecurityEvent {
+                kind: EventKind::Holding,
+                isin: Some("GB00B03MLX29".into()),
+                quantity: Some(500.0),
+                ..Default::default()
+            },
+            SecurityEvent {
+                kind: EventKind::Holding,
+                isin: None,
+                quantity: Some(10.0),
+                ..Default::default()
+            },
         ];
         let p = summarize_positions(&events);
         assert_eq!(p.positions, 3);

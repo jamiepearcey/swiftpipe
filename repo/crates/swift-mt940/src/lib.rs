@@ -95,7 +95,11 @@ pub fn parse_mt940(fin: &str, message_id: &str) -> Option<CashStatement> {
         .opening_balance
         .as_ref()
         .and_then(|b| b.currency.clone())
-        .or_else(|| stmt.closing_balance.as_ref().and_then(|b| b.currency.clone()));
+        .or_else(|| {
+            stmt.closing_balance
+                .as_ref()
+                .and_then(|b| b.currency.clone())
+        });
 
     if saw_any {
         Some(stmt)
@@ -117,14 +121,23 @@ fn parse_balance(s: &str) -> Option<Balance> {
     let date = yymmdd_to_iso(&rest[0..6]);
     let currency = rest[6..9].to_string();
     let amount = parse_amount(&rest[9..])?;
-    Some(Balance { direction: dir, date, currency: Some(currency), amount })
+    Some(Balance {
+        direction: dir,
+        date,
+        currency: Some(currency),
+        amount,
+    })
 }
 
 /// Parse a `:61:` statement line (first line only; supplementary → `info`).
 fn parse_statement_line(s: &str) -> Option<CashEntry> {
     let mut lines = s.splitn(2, '\n');
     let head = lines.next()?.trim();
-    let info = lines.next().map(str::trim).filter(|x| !x.is_empty()).map(str::to_string);
+    let info = lines
+        .next()
+        .map(str::trim)
+        .filter(|x| !x.is_empty())
+        .map(str::to_string);
     if head.len() < 7 {
         return None;
     }
@@ -135,7 +148,10 @@ fn parse_statement_line(s: &str) -> Option<CashEntry> {
     // Optional entry date MMDD (4 digits) — only if followed by a D/C mark.
     if head.len() >= pos + 5
         && head[pos..pos + 4].bytes().all(|b| b.is_ascii_digit())
-        && head.as_bytes().get(pos + 4).is_some_and(|b| matches!(b, b'C' | b'D' | b'R'))
+        && head
+            .as_bytes()
+            .get(pos + 4)
+            .is_some_and(|b| matches!(b, b'C' | b'D' | b'R'))
     {
         // Skip the optional entry date (MMDD); value_date is the P&L-relevant one.
         pos += 4;
@@ -160,7 +176,11 @@ fn parse_statement_line(s: &str) -> Option<CashEntry> {
     };
 
     // Optional 1-char funds code before the amount (amount starts with a digit).
-    if head.as_bytes().get(pos).is_some_and(|b| b.is_ascii_alphabetic()) {
+    if head
+        .as_bytes()
+        .get(pos)
+        .is_some_and(|b| b.is_ascii_alphabetic())
+    {
         pos += 1;
     }
 
@@ -242,7 +262,10 @@ mod tests {
         assert_eq!(stmt.entries[0].customer_ref.as_deref(), Some("CUST-A"));
         assert_eq!(stmt.entries[0].bank_ref.as_deref(), Some("BANKREF-A"));
         assert_eq!(stmt.entries[0].signed_amount, 25000.0);
-        assert_eq!(stmt.entries[0].info.as_deref(), Some("Coupon receipt ACME 5% 2028"));
+        assert_eq!(
+            stmt.entries[0].info.as_deref(),
+            Some("Coupon receipt ACME 5% 2028")
+        );
         assert_eq!(stmt.entries[1].direction, Direction::Debit);
         assert_eq!(stmt.entries[1].signed_amount, -5000.0);
 

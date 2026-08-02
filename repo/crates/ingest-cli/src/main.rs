@@ -50,10 +50,22 @@ fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--out-dir" => out_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--out-dir needs a value"))?,
-            "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
+            "--out-dir" => {
+                out_dir = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--out-dir needs a value"))?
+            }
+            "--schema-dir" => {
+                schema_dir = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--schema-dir needs a value"))?
+            }
             "--type" => {
-                forced = Some(parse_route(&args.next().ok_or_else(|| anyhow!("--type needs a value"))?)?);
+                forced = Some(parse_route(
+                    &args.next().ok_or_else(|| anyhow!("--type needs a value"))?,
+                )?);
             }
             "-h" | "--help" => {
                 eprintln!("usage: ingest <input> [--type auto|mt940|camt053|mt-securities|csv] [--schema-dir DIR] [--out-dir DIR]");
@@ -70,7 +82,8 @@ fn main() -> Result<()> {
     }
 
     let input = input.ok_or_else(|| anyhow!("missing input file (see --help)"))?;
-    let content = std::fs::read_to_string(&input).with_context(|| format!("reading {}", input.display()))?;
+    let content =
+        std::fs::read_to_string(&input).with_context(|| format!("reading {}", input.display()))?;
     std::fs::create_dir_all(&out_dir).ok();
 
     let route = match forced {
@@ -80,7 +93,9 @@ fn main() -> Result<()> {
 
     match route {
         Route::CashMt940 | Route::CashCamt => run_cash(route, &content, &out_dir),
-        Route::PositionsCsv | Route::PositionsMt => run_positions(route, &content, &schema_dir, &out_dir),
+        Route::PositionsCsv | Route::PositionsMt => {
+            run_positions(route, &content, &schema_dir, &out_dir)
+        }
     }
 }
 
@@ -161,8 +176,18 @@ fn run_snapshot() -> Result<()> {
     let mut args = std::env::args().skip(2); // skip argv0 + "snapshot"
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--out" => out = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--out needs a value"))?,
-            "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
+            "--out" => {
+                out = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--out needs a value"))?
+            }
+            "--schema-dir" => {
+                schema_dir = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--schema-dir needs a value"))?
+            }
             "-h" | "--help" => {
                 eprintln!("usage: ingest snapshot <files...> [--out recon-snapshot.json] [--schema-dir DIR]");
                 return Ok(());
@@ -177,11 +202,15 @@ fn run_snapshot() -> Result<()> {
     let mut statements: Vec<CashStatement> = Vec::new();
     let mut events: Vec<SecurityEvent> = Vec::new();
     for path in &inputs {
-        let content = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-        let route = detect(path, &content).with_context(|| format!("detecting type of {}", path.display()))?;
+        let content =
+            std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let route = detect(path, &content)
+            .with_context(|| format!("detecting type of {}", path.display()))?;
         match route {
             Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
-            Route::PositionsCsv | Route::PositionsMt => events.extend(parse_positions(route, &content, &schema_dir)?),
+            Route::PositionsCsv | Route::PositionsMt => {
+                events.extend(parse_positions(route, &content, &schema_dir)?)
+            }
         }
     }
 
@@ -209,10 +238,30 @@ fn run_store() -> Result<()> {
     let mut args = std::env::args().skip(2);
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--store" => store = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--store needs a value"))?,
-            "--schema-dir" => schema_dir = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--schema-dir needs a value"))?,
-            "--penalty-statement" => penalty_statement = Some(args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--penalty-statement needs a value"))?),
-            "--currency" => default_currency = args.next().ok_or_else(|| anyhow!("--currency needs a value"))?,
+            "--store" => {
+                store = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--store needs a value"))?
+            }
+            "--schema-dir" => {
+                schema_dir = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--schema-dir needs a value"))?
+            }
+            "--penalty-statement" => {
+                penalty_statement = Some(
+                    args.next()
+                        .map(PathBuf::from)
+                        .ok_or_else(|| anyhow!("--penalty-statement needs a value"))?,
+                )
+            }
+            "--currency" => {
+                default_currency = args
+                    .next()
+                    .ok_or_else(|| anyhow!("--currency needs a value"))?
+            }
             "-h" | "--help" => {
                 eprintln!("usage: ingest store <files...> [--store recon-store] [--schema-dir DIR] [--penalty-statement FILE.csv] [--currency EUR]");
                 return Ok(());
@@ -227,8 +276,10 @@ fn run_store() -> Result<()> {
     let mut statements: Vec<CashStatement> = Vec::new();
     let mut events: Vec<SecurityEvent> = Vec::new();
     for path in &inputs {
-        let content = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-        let route = detect(path, &content).with_context(|| format!("detecting type of {}", path.display()))?;
+        let content =
+            std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+        let route = detect(path, &content)
+            .with_context(|| format!("detecting type of {}", path.display()))?;
         match route {
             Route::CashMt940 | Route::CashCamt => statements.extend(parse_cash(route, &content)),
             Route::PositionsCsv | Route::PositionsMt => {
@@ -249,13 +300,15 @@ fn run_store() -> Result<()> {
     // The CSD monthly penalty statement (reported figures), when provided.
     let reported = match &penalty_statement {
         Some(path) => {
-            let csv = std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+            let csv = std::fs::read_to_string(path)
+                .with_context(|| format!("reading {}", path.display()))?;
             ingest_penalty::parse_penalty_statement_csv(&csv)
         }
         None => Vec::new(),
     };
 
-    std::fs::create_dir_all(&store).with_context(|| format!("creating store {}", store.display()))?;
+    std::fs::create_dir_all(&store)
+        .with_context(|| format!("creating store {}", store.display()))?;
     ingest_parquet::write_cash_statements(&statements, &store.join("cash_statements.parquet"))?;
     ingest_parquet::write_cash_entries(&statements, &store.join("cash_entries.parquet"))?;
     ingest_parquet::write_security_events(&events, &store.join("positions.parquet"))?;
@@ -263,9 +316,19 @@ fn run_store() -> Result<()> {
     ingest_parquet::write_penalty_statements(&reported, &store.join("penalty_statements.parquet"))?;
 
     println!("statements : {}", statements.len());
-    println!("entries    : {}", statements.iter().map(|s| s.entries.len()).sum::<usize>());
-    println!("positions  : {}", events.iter().filter(|e| e.isin.is_some()).count());
-    println!("penalties  : {} computed, {} reported", accruals.len(), reported.len());
+    println!(
+        "entries    : {}",
+        statements.iter().map(|s| s.entries.len()).sum::<usize>()
+    );
+    println!(
+        "positions  : {}",
+        events.iter().filter(|e| e.isin.is_some()).count()
+    );
+    println!(
+        "penalties  : {} computed, {} reported",
+        accruals.len(),
+        reported.len()
+    );
     println!("→ store {}", store.display());
     Ok(())
 }
@@ -279,9 +342,18 @@ fn run_serve_cmd() -> Result<()> {
     let mut args = std::env::args().skip(2);
     while let Some(a) = args.next() {
         match a.as_str() {
-            "--store" => store = args.next().map(PathBuf::from).ok_or_else(|| anyhow!("--store needs a value"))?,
+            "--store" => {
+                store = args
+                    .next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| anyhow!("--store needs a value"))?
+            }
             "--bind" => {
-                bind = args.next().ok_or_else(|| anyhow!("--bind needs a value"))?.parse().context("parsing --bind address")?;
+                bind = args
+                    .next()
+                    .ok_or_else(|| anyhow!("--bind needs a value"))?
+                    .parse()
+                    .context("parsing --bind address")?;
             }
             "-h" | "--help" => {
                 eprintln!("usage: ingest serve [--store recon-store] [--bind 127.0.0.1:7390]");
@@ -293,14 +365,29 @@ fn run_serve_cmd() -> Result<()> {
     serve::run_serve(store, bind)
 }
 
-fn parse_mt_securities(content: &str, schema_dir: &Path) -> Result<Vec<ingest_core::SecurityEvent>> {
-    let mtype = detect_mt_type(content).context("could not detect the MT message type from the FIN header")?;
+fn parse_mt_securities(
+    content: &str,
+    schema_dir: &Path,
+) -> Result<Vec<ingest_core::SecurityEvent>> {
+    let mtype = detect_mt_type(content)
+        .context("could not detect the MT message type from the FIN header")?;
     let schema_path = schema_dir.join(format!("{}.yaml", mtype.to_lowercase()));
-    let yaml = std::fs::read_to_string(&schema_path)
-        .with_context(|| format!("reading schema {} (pass --schema-dir)", schema_path.display()))?;
-    let catalog = swift_schema::SchemaCatalog::from_yaml_str(&yaml).map_err(|e| anyhow!("schema parse: {e:?}"))?;
-    catalog.validate().map_err(|e| anyhow!("invalid schema: {e:?}"))?;
-    let inbound = swift_db::InboundMessage { id: "cli".into(), message_type: mtype, body: content.to_string() };
+    let yaml = std::fs::read_to_string(&schema_path).with_context(|| {
+        format!(
+            "reading schema {} (pass --schema-dir)",
+            schema_path.display()
+        )
+    })?;
+    let catalog = swift_schema::SchemaCatalog::from_yaml_str(&yaml)
+        .map_err(|e| anyhow!("schema parse: {e:?}"))?;
+    catalog
+        .validate()
+        .map_err(|e| anyhow!("invalid schema: {e:?}"))?;
+    let inbound = swift_db::InboundMessage {
+        id: "cli".into(),
+        message_type: mtype,
+        body: content.to_string(),
+    };
     let parsed = swift_core::parse_message(inbound.body.as_bytes());
     let batch = swift_db::materialize_message(&catalog, &inbound, &parsed)?;
     Ok(swift_normalize::normalize(&batch))
@@ -318,7 +405,11 @@ fn parse_route(s: &str) -> Result<Route> {
 }
 
 fn detect(path: &Path, content: &str) -> Result<Route> {
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
     if ext == "xml" || content.trim_start().starts_with("<?xml") || content.contains("camt.053") {
         return Ok(Route::CashCamt);
     }
@@ -331,7 +422,15 @@ fn detect(path: &Path, content: &str) -> Result<Route> {
     if content.contains(":35B:") {
         return Ok(Route::PositionsMt);
     }
-    if content.lines().next().map(|l| { let l = l.to_ascii_lowercase(); l.contains("isin") && l.contains(',') }).unwrap_or(false) {
+    if content
+        .lines()
+        .next()
+        .map(|l| {
+            let l = l.to_ascii_lowercase();
+            l.contains("isin") && l.contains(',')
+        })
+        .unwrap_or(false)
+    {
         return Ok(Route::PositionsCsv);
     }
     bail!("could not detect input type; pass --type mt940|camt053|mt-securities|csv")
@@ -355,16 +454,31 @@ mod tests {
 
     #[test]
     fn detects_mt_type_from_header() {
-        assert_eq!(detect_mt_type("{1:F01BANKBEBB}{2:I535BANKDEFFXXXXN}{4:").as_deref(), Some("MT535"));
+        assert_eq!(
+            detect_mt_type("{1:F01BANKBEBB}{2:I535BANKDEFFXXXXN}{4:").as_deref(),
+            Some("MT535")
+        );
         assert_eq!(detect_mt_type("{2:O940BANK}").as_deref(), Some("MT940"));
         assert_eq!(detect_mt_type("no header"), None);
     }
 
     #[test]
     fn routes_by_content() {
-        assert_eq!(detect(Path::new("x.fin"), ":20:R\n:61:2605...").unwrap(), Route::CashMt940);
-        assert_eq!(detect(Path::new("x.fin"), ":35B:ISIN GB00...").unwrap(), Route::PositionsMt);
-        assert_eq!(detect(Path::new("x.xml"), "<?xml version=\"1.0\"?>").unwrap(), Route::CashCamt);
-        assert_eq!(detect(Path::new("x.csv"), "isin,quantity\n").unwrap(), Route::PositionsCsv);
+        assert_eq!(
+            detect(Path::new("x.fin"), ":20:R\n:61:2605...").unwrap(),
+            Route::CashMt940
+        );
+        assert_eq!(
+            detect(Path::new("x.fin"), ":35B:ISIN GB00...").unwrap(),
+            Route::PositionsMt
+        );
+        assert_eq!(
+            detect(Path::new("x.xml"), "<?xml version=\"1.0\"?>").unwrap(),
+            Route::CashCamt
+        );
+        assert_eq!(
+            detect(Path::new("x.csv"), "isin,quantity\n").unwrap(),
+            Route::PositionsCsv
+        );
     }
 }

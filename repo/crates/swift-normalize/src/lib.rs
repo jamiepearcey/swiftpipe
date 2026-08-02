@@ -14,8 +14,8 @@ use ingest_core::{extract_isin, EventKind, SecurityEvent, SecuritySource};
 use swift_db::{FieldRow, NormalizedRow, ParsedOutputBatch, RawMessageRow};
 
 // Re-export the shared model so existing consumers of this crate keep working.
-pub use ingest_core::{is_isin, EventKind as Kind, SecurityEvent as Event};
 pub use ingest_core::extract_isin as extract_isin_blob;
+pub use ingest_core::{is_isin, EventKind as Kind, SecurityEvent as Event};
 
 /// Classify a SWIFT message type into a platform event kind.
 pub fn classify(message_type: &str) -> EventKind {
@@ -74,7 +74,9 @@ fn normalize_message(batch: &ParsedOutputBatch, msg: &RawMessageRow) -> Vec<Secu
     let rows: Vec<&NormalizedRow> = batch
         .normalized_rows
         .iter()
-        .filter(|row| row.values.get("message_id").map(String::as_str) == Some(msg.message_id.as_str()))
+        .filter(|row| {
+            row.values.get("message_id").map(String::as_str) == Some(msg.message_id.as_str())
+        })
         .collect();
 
     // Every row that yields an ISIN is one transaction occurrence; its
@@ -99,7 +101,15 @@ fn normalize_message(batch: &ParsedOutputBatch, msg: &RawMessageRow) -> Vec<Secu
     instruments
         .into_iter()
         .map(|(path, isin, instrument_desc)| {
-            build_event(batch, msg, kind, &rows, Some(path.as_str()), isin, instrument_desc)
+            build_event(
+                batch,
+                msg,
+                kind,
+                &rows,
+                Some(path.as_str()),
+                isin,
+                instrument_desc,
+            )
         })
         .collect()
 }
@@ -114,8 +124,10 @@ fn build_event(
     isin: Option<String>,
     instrument_desc: Option<String>,
 ) -> SecurityEvent {
-    let amount_field = find_field(rows, instrument_path, |t, c| t.contains("transaction") && c == "amount")
-        .or_else(|| find_field(rows, instrument_path, |_, c| c == "amount"));
+    let amount_field = find_field(rows, instrument_path, |t, c| {
+        t.contains("transaction") && c == "amount"
+    })
+    .or_else(|| find_field(rows, instrument_path, |_, c| c == "amount"));
     let amount = amount_field
         .and_then(|(row, col)| row.values.get(col))
         .and_then(|v| v.parse::<f64>().ok());
@@ -138,9 +150,11 @@ fn build_event(
         kind,
         isin,
         instrument_desc,
-        quantity: scan_value(rows, instrument_path, |t, c| t == "settlement_quantity" && c == "quantity")
-            .or_else(|| scan_value(rows, instrument_path, |_, c| c == "quantity"))
-            .and_then(|v| v.parse::<f64>().ok()),
+        quantity: scan_value(rows, instrument_path, |t, c| {
+            t == "settlement_quantity" && c == "quantity"
+        })
+        .or_else(|| scan_value(rows, instrument_path, |_, c| c == "quantity"))
+        .and_then(|v| v.parse::<f64>().ok()),
         // Posting / settlement amount — the CSDR penalty base. MT537 keeps
         // it under `mt537_transaction.amount` (:19A::PSTA); prefer that over
         // any reported-penalty amounts in a PENA block.
@@ -163,13 +177,17 @@ fn build_event(
             .or_else(|| {
                 scan_value(rows, instrument_path, |t, c| c == "account" && (t.contains("account") || t.contains("party")))
             }),
-        party_bic: scan_value(rows, instrument_path, |t, c| t == "settlement_party" && c == "party")
-            .or_else(|| scan_value(rows, instrument_path, |_, c| c == "party")),
+        party_bic: scan_value(rows, instrument_path, |t, c| {
+            t == "settlement_party" && c == "party"
+        })
+        .or_else(|| scan_value(rows, instrument_path, |_, c| c == "party")),
         // Statement-of-status messages (MT537 pending transactions) report a
         // per-transaction status code (:25D::IPRC//PEND). Other securities
         // flows have no status, leaving this `None`.
-        status: scan_value(rows, instrument_path, |t, c| c == "status_code" && t.contains("status"))
-            .or_else(|| scan_value(rows, instrument_path, |_, c| c == "status_code")),
+        status: scan_value(rows, instrument_path, |t, c| {
+            c == "status_code" && t.contains("status")
+        })
+        .or_else(|| scan_value(rows, instrument_path, |_, c| c == "status_code")),
     }
 }
 
@@ -180,8 +198,14 @@ fn build_event(
 /// searched across the whole message since it isn't transaction-scoped);
 /// else `None`.
 fn scan_transaction_ref(rows: &[&NormalizedRow], instrument_path: Option<&str>) -> Option<String> {
-    scan_value(rows, instrument_path, |t, c| t == "mt537_transaction_link" && c == "linked_reference")
-        .or_else(|| scan_value(rows, None, |t, c| t == "mt537_statement" && c == "sender_reference"))
+    scan_value(rows, instrument_path, |t, c| {
+        t == "mt537_transaction_link" && c == "linked_reference"
+    })
+    .or_else(|| {
+        scan_value(rows, None, |t, c| {
+            t == "mt537_statement" && c == "sender_reference"
+        })
+    })
 }
 
 /// The settlement date selected by SWIFT qualifier `SETT` on a date-shaped
@@ -190,11 +214,17 @@ fn scan_transaction_ref(rows: &[&NormalizedRow], instrument_path: Option<&str>) 
 /// schema happens to choose) — never a statement-level date. Scoped to the
 /// transaction branch when one is known; `None` if no SETT-qualified field is
 /// present, rather than guessing.
-fn scan_settlement_date(fields: &[FieldRow], message_id: &str, instrument_path: Option<&str>) -> Option<String> {
+fn scan_settlement_date(
+    fields: &[FieldRow],
+    message_id: &str,
+    instrument_path: Option<&str>,
+) -> Option<String> {
     let mut candidates: Vec<&FieldRow> = fields
         .iter()
         .filter(|f| {
-            f.message_id == message_id && f.qualifier.as_deref() == Some("SETT") && f.tag.starts_with("98")
+            f.message_id == message_id
+                && f.qualifier.as_deref() == Some("SETT")
+                && f.tag.starts_with("98")
         })
         .collect();
 
@@ -210,7 +240,9 @@ fn scan_settlement_date(fields: &[FieldRow], message_id: &str, instrument_path: 
         });
     }
 
-    candidates.first().map(|f| format_swift_date(raw_qualified_value(&f.raw_value)))
+    candidates
+        .first()
+        .map(|f| format_swift_date(raw_qualified_value(&f.raw_value)))
 }
 
 /// A SWIFT qualified field's raw value is captured whole (e.g. `:SETT//20260512`);
@@ -234,7 +266,8 @@ fn format_swift_date(raw: &str) -> String {
 /// immediately followed by a digit.
 fn extract_currency_prefix(raw: &str) -> Option<String> {
     let bytes = raw.as_bytes();
-    if bytes.len() > 3 && bytes[..3].iter().all(u8::is_ascii_uppercase) && bytes[3].is_ascii_digit() {
+    if bytes.len() > 3 && bytes[..3].iter().all(u8::is_ascii_uppercase) && bytes[3].is_ascii_digit()
+    {
         Some(raw[..3].to_string())
     } else {
         None
@@ -259,7 +292,11 @@ fn find_field<'a>(
 }
 
 /// First value, in scope order, whose (table, column) satisfies `pred`.
-fn scan_value(rows: &[&NormalizedRow], instrument_path: Option<&str>, pred: impl Fn(&str, &str) -> bool) -> Option<String> {
+fn scan_value(
+    rows: &[&NormalizedRow],
+    instrument_path: Option<&str>,
+    pred: impl Fn(&str, &str) -> bool,
+) -> Option<String> {
     find_field(rows, instrument_path, pred).and_then(|(row, col)| row.values.get(col).cloned())
 }
 
@@ -267,7 +304,10 @@ fn scan_value(rows: &[&NormalizedRow], instrument_path: Option<&str>, pred: impl
 /// the same branch (nearest/deepest match first), then root-scope (`"$"`)
 /// rows; when unknown (no identifiable transaction in the message), every
 /// row, unscoped — the original message-wide scan.
-fn scoped_rows<'a>(rows: &[&'a NormalizedRow], instrument_path: Option<&str>) -> Vec<&'a NormalizedRow> {
+fn scoped_rows<'a>(
+    rows: &[&'a NormalizedRow],
+    instrument_path: Option<&str>,
+) -> Vec<&'a NormalizedRow> {
     let Some(instrument_path) = instrument_path else {
         return rows.to_vec();
     };
@@ -281,7 +321,11 @@ fn scoped_rows<'a>(rows: &[&'a NormalizedRow], instrument_path: Option<&str>) ->
         .copied()
         .collect();
     branch.sort_by_key(|row| {
-        let path = row.values.get("sequence_path").map(String::as_str).unwrap_or("");
+        let path = row
+            .values
+            .get("sequence_path")
+            .map(String::as_str)
+            .unwrap_or("");
         std::cmp::Reverse(shared_depth(path, instrument_path))
     });
     let root = rows
@@ -438,7 +482,11 @@ mod tests {
         let batch = materialize_message(&catalog, &inbound, &parsed).expect("materialize");
 
         let events = SwiftSource.ingest(&batch);
-        assert_eq!(events.len(), 2, "one event per pending transaction, not one per message");
+        assert_eq!(
+            events.len(),
+            2,
+            "one event per pending transaction, not one per message"
+        );
 
         let gilt = events
             .iter()

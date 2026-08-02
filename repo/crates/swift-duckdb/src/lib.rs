@@ -1281,7 +1281,8 @@ messages:
                 .message(&message.message_type)
                 .map(swift_schema::anchored_sequences)
                 .unwrap_or_default();
-            let parsed = swift_core::parse_message_with_sequences(message.body.as_bytes(), &anchored);
+            let parsed =
+                swift_core::parse_message_with_sequences(message.body.as_bytes(), &anchored);
             assert!(
                 parsed.diagnostics.is_empty(),
                 "{} sample should parse without diagnostics: {:?}",

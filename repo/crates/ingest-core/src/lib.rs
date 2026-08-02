@@ -217,7 +217,11 @@ pub fn extract_isin(blob: &str) -> (Option<String>, Option<String>) {
         }
         desc.push(line);
     }
-    let desc = if desc.is_empty() { None } else { Some(desc.join(" ")) };
+    let desc = if desc.is_empty() {
+        None
+    } else {
+        Some(desc.join(" "))
+    };
     (isin, desc)
 }
 
