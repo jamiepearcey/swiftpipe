@@ -504,4 +504,128 @@ messages:
             Some(&"REL2".to_string())
         );
     }
+
+    // Regression coverage for broker-recon issue #1: a real MT535 Statement
+    // of Holdings message (SUBSAFE/FIN/SUBBAL-shaped, not the
+    // TRADDET-shaped settlement-instruction sample the rest of this crate's
+    // MT535 tests use) must materialize cleanly against the real
+    // examples/schemas/mt535.yaml -- no UnknownSequence diagnostics -- and
+    // its aggregate (93B::AGGR) and sub-balance (93C::OTHR) values must
+    // survive as distinct, correctly-scoped rows per instrument. Fixture
+    // generated from broker-recon's MT535 wire emitter
+    // (py/fixtures/wire/mt535.py), which is itself sourced from
+    // docs/domain/mt535-sub-balances.md.
+    const MT535_SCHEMA: &str = include_str!("../../../examples/schemas/mt535.yaml");
+    const MT535_HOLDINGS_FIN: &str = include_str!("../../../examples/mt535_holdings_sample.fin");
+
+    #[test]
+    fn mt535_real_holdings_message_materializes_without_unknown_sequence() {
+        let catalog = SchemaCatalog::from_yaml_str(MT535_SCHEMA).expect("schema loads");
+        catalog.validate().expect("schema validates");
+        let inbound = InboundMessage {
+            id: "msg-535-holdings".to_string(),
+            message_type: "MT535".to_string(),
+            body: MT535_HOLDINGS_FIN.to_string(),
+        };
+        let parsed = parse_message(inbound.body.as_bytes());
+        assert!(
+            parsed.diagnostics.is_empty(),
+            "structural parse should be clean: {:?}",
+            parsed.diagnostics
+        );
+
+        let batch = materialize_message(&catalog, &inbound, &parsed).expect("materializes");
+
+        let unknown_sequence_errors: Vec<_> = batch
+            .parse_errors
+            .iter()
+            .filter(|row| row.error.contains("UnknownSequence"))
+            .collect();
+        assert!(
+            unknown_sequence_errors.is_empty(),
+            "SUBBAL must be a known sequence, found: {unknown_sequence_errors:?}"
+        );
+    }
+
+    #[test]
+    fn mt535_real_holdings_message_keeps_aggregate_and_sub_balance_distinct_per_instrument() {
+        let catalog = SchemaCatalog::from_yaml_str(MT535_SCHEMA).expect("schema loads");
+        catalog.validate().expect("schema validates");
+        let inbound = InboundMessage {
+            id: "msg-535-holdings".to_string(),
+            message_type: "MT535".to_string(),
+            body: MT535_HOLDINGS_FIN.to_string(),
+        };
+        let parsed = parse_message(inbound.body.as_bytes());
+        let batch = materialize_message(&catalog, &inbound, &parsed).expect("materializes");
+
+        let balance_rows: Vec<_> = batch
+            .normalized_rows
+            .iter()
+            .filter(|row| row.table == "mt535_balance")
+            .collect();
+        let sub_balance_rows: Vec<_> = batch
+            .normalized_rows
+            .iter()
+            .filter(|row| row.table == "mt535_sub_balance")
+            .collect();
+
+        // Two FIN occurrences (Acme, Globex) -> two aggregate rows, never
+        // collapsed into one.
+        assert_eq!(balance_rows.len(), 2, "one AGGR row per instrument");
+        let acme = balance_rows
+            .iter()
+            .find(|row| {
+                row.values
+                    .get("instrument")
+                    .is_some_and(|v| v.contains("GB00B0ACME15"))
+            })
+            .expect("Acme FIN row present");
+        let globex = balance_rows
+            .iter()
+            .find(|row| {
+                row.values
+                    .get("instrument")
+                    .is_some_and(|v| v.contains("US37940X8168"))
+            })
+            .expect("Globex FIN row present");
+
+        // normalize_swift_quantity turns the wire's trailing-comma decimal
+        // marker ("100000,") into a trailing dot ("100000.") -- matches the
+        // convention every other *_quantity field type in this schema
+        // already normalizes to.
+        assert_eq!(acme.values.get("quantity"), Some(&"100000.".to_string()));
+        assert_eq!(acme.values.get("balance_type"), Some(&"UNIT".to_string()));
+        assert_eq!(globex.values.get("quantity"), Some(&"50000.".to_string()));
+
+        // Only Acme carries a SUBBAL occurrence (Globex is fully available,
+        // no SUBBAL block at all in the wire) -- absence must not be
+        // fabricated into a spurious sub-balance row for Globex.
+        assert_eq!(sub_balance_rows.len(), 1, "only Acme has a sub-balance");
+        let loan = sub_balance_rows[0];
+        assert_eq!(
+            loan.values.get("sub_balance_type"),
+            Some(&"LOAN".to_string())
+        );
+        assert_eq!(loan.values.get("quantity"), Some(&"20000.".to_string()));
+        let acme_fin_path = acme
+            .values
+            .get("sequence_path")
+            .expect("Acme row has a sequence_path");
+        assert!(
+            loan.values
+                .get("sequence_path")
+                .is_some_and(|path| path.starts_with(acme_fin_path.as_str())),
+            "the LOAN sub-balance must be scoped under Acme's own FIN occurrence, not Globex's"
+        );
+
+        // Direct regression check for the mt535-sub-balances.md §3 failure
+        // mode: the aggregate (100000) must never be silently replaced by,
+        // or conflated with, the sub-balance value (20000).
+        assert_ne!(
+            acme.values.get("quantity"),
+            loan.values.get("quantity"),
+            "AGGR must not be overwritten by a SUBBAL quantity"
+        );
+    }
 }

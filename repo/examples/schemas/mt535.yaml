@@ -70,6 +70,104 @@ field_types:
   pattern:
   - kind: rest
     name: value
+- name: mt535_aggregate_balance
+  # 93B at Subsequence B1 (FIN): qualifier//balance-type/quantity. Selects
+  # the balance-type code (FAMT/UNIT); see mt535_aggregate_quantity for the
+  # sibling rule that selects the quantity out of the same wire shape.
+  # Source: docs/domain/mt535-sub-balances.md (broker-recon) §5.2 — verified
+  # structure (§1 Subsequence B1).
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: capture
+    name: value
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: rest
+    name: residual
+- name: mt535_aggregate_quantity
+  # Same 93B wire shape as mt535_aggregate_balance; selects the signed
+  # quantity instead of the balance-type code.
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: capture
+    name: unit
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: rest
+    name: quantity
+- name: mt535_sub_balance_type
+  # 93C at Subsequence B1b (SUBBAL): qualifier//balance-type/sub-balance-type/
+  # quantity. At this position the qualifier is the fixed structural literal
+  # OTHR (see mt535-sub-balances.md §1's explicit warning: OTHR here means
+  # "see the embedded sub-type code", not a balance-type value). Selects the
+  # sub-balance-type code (LOAN, PLED, BLOK, ...).
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: capture
+    name: unit
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: capture
+    name: code
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: rest
+    name: residual
+- name: mt535_sub_balance_quantity
+  # Same 93C wire shape as mt535_sub_balance_type; selects the signed
+  # quantity instead of the sub-balance-type code.
+  pattern:
+  - kind: literal
+    value: ":"
+  - kind: capture
+    name: qualifier
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "//"
+  - kind: capture
+    name: unit
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: capture
+    name: subtype
+    value_type: alpha_num
+    length: 4
+  - kind: literal
+    value: "/"
+  - kind: rest
+    name: quantity
 messages:
 - message: MT535
   category: securities
@@ -78,13 +176,37 @@ messages:
     source: starter schema derived from common settlement instruction structure; not
       licensed SRU import
     exact: false
-    expected_sequences: 9
-    expected_fields: 19
+    expected_sequences: 10
+    expected_fields: 24
     notes:
     - Models common GENL, TRADDET, FIAC, SETDET, SETPRTY, and amount/date/reference
       fields.
     - Exact reproduction requires licensed SWIFT/ISO source import and full network
       validation rules.
+    - SUBBAL (Subsequence B1b, nested under FIN) added per broker-recon issue 1
+      (swiftpipe UnknownSequence on real MT535 holdings messages) and
+      docs/domain/mt535-sub-balances.md. Field rules cover the verified
+      structure only -- 35B instrument id and 93B::AGGR (aggregate balance) at
+      FIN, and 93C::OTHR (detailed sub-balance, e.g. LOAN/PLED/BLOK) at
+      SUBBAL. The alternate 93B::AVAI/NAVL-inside-SUBBAL binary-availability
+      form is deliberately NOT modeled -- that document's §1 flags a genuine,
+      unresolved structural ambiguity between the NVR text (which reads as if
+      AVAI/NAVL nest inside SUBBAL) and the one-page structural reference
+      (which places them at FIN level, before SUBBAL) -- confirm against a
+      real multi-instrument sample or the licensed SRU before adding it.
+    - AGGR (aggregate, at FIN) and the SUBBAL-nested sub-balance are modeled
+      as distinct entities/columns on purpose -- AGGR is the total holding,
+      not an available/encumbrance-adjusted figure, and the two must never be
+      read as interchangeable downstream.
+    - None of the new SUBSAFE/FIN/SUBBAL field rules are marked required --
+      this schema already models two structurally-incompatible MT535 shapes
+      in one file (the pre-existing TRADDET/FIAC/SETDET settlement-instruction
+      fields, and this addition's holdings-statement fields), and a message
+      using one shape legitimately has zero occurrences of the other's
+      sequences. required (and min>0) is message-wide, not per-occurrence-of-
+      an-optional-parent, in this schema engine, so marking any of these
+      fields required breaks materialization of every message that uses the
+      other shape.
   sequences:
     GENL: {}
     STAT:
@@ -97,6 +219,9 @@ messages:
       repeat: true
     FIN:
       parent: SUBSAFE
+      repeat: true
+    SUBBAL:
+      parent: FIN
       repeat: true
     FXORDER:
       repeat: true
@@ -385,3 +510,63 @@ messages:
     render:
       option: P
       qualifier: PSET
+
+  # --- Subsequence B1 (FIN) / B1b (SUBBAL): holdings statement content ---
+  # Added per broker-recon issue #1 and docs/domain/mt535-sub-balances.md
+  # §5.1-5.3 (verified structure only; see the coverage.notes flag above
+  # for the one deliberately-omitted, unresolved ambiguity).
+  - path: SUBSAFE/FIN
+    tag: 35B
+    name: sub_safekeeping_instrument
+    type: settlement_text
+    max: 1
+    entity: mt535_balance
+    column: instrument
+  - path: SUBSAFE/FIN
+    tag: 93a
+    options:
+    - B
+    qualifier: AGGR
+    name: aggregate_balance_type
+    type: mt535_aggregate_balance
+    entity: mt535_balance
+    column: balance_type
+    render:
+      option: B
+      qualifier: AGGR
+  - path: SUBSAFE/FIN
+    tag: 93a
+    options:
+    - B
+    qualifier: AGGR
+    name: aggregate_quantity
+    type: mt535_aggregate_quantity
+    entity: mt535_balance
+    column: quantity
+    render:
+      option: B
+      qualifier: AGGR
+  - path: SUBSAFE/FIN/SUBBAL
+    tag: 93a
+    options:
+    - C
+    qualifier: OTHR
+    name: sub_balance_type
+    type: mt535_sub_balance_type
+    entity: mt535_sub_balance
+    column: sub_balance_type
+    render:
+      option: C
+      qualifier: OTHR
+  - path: SUBSAFE/FIN/SUBBAL
+    tag: 93a
+    options:
+    - C
+    qualifier: OTHR
+    name: sub_balance_quantity
+    type: mt535_sub_balance_quantity
+    entity: mt535_sub_balance
+    column: quantity
+    render:
+      option: C
+      qualifier: OTHR
