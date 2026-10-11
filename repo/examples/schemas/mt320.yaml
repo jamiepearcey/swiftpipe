@@ -1,0 +1,266 @@
+---
+# MT320 (Fixed Loan/Deposit Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT320.txt. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt320_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT320
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 3
+    expected_fields: 28
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["14D", "17R", "30P", "30T", "30V", "30X", "32B", "34E", "37G"]
+      repeat: true
+    C:
+      anchor_tag: "15C"
+      member_tags: ["53A", "53D", "53J", "56A", "56D", "56J", "57A", "57D", "57J", "58A", "58D", "58J"]
+      repeat: true
+    D:
+      anchor_tag: "15D"
+      member_tags: ["53A", "53D", "53J", "56A", "56D", "56J", "57A", "57D", "57J", "58A", "58D", "58J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt320_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt320_deal
+    column: senders_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt320_text
+    max: 1
+    entity: mt320_deal
+    column: related_reference
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt320_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt320_deal
+    column: type_of_operation
+  - path: $
+    tag: "22B"
+    name: type_of_event
+    type: mt320_text
+    entity: mt320_deal
+    column: type_of_event
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt320_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt320_deal
+    column: common_reference
+  - path: $
+    tag: "94A"
+    name: scope_of_operation
+    type: mt320_text
+    max: 1
+    entity: mt320_deal
+    column: scope_of_operation
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt320_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt320_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt320_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt320_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: 83a
+    options: ["A", "D", "J"]
+    name: fund_or_beneficiary
+    type: mt320_text
+    max: 1
+    entity: mt320_deal
+    column: fund_or_beneficiary
+    render:
+      option: A
+  - path: $
+    tag: "77D"
+    name: terms_and_conditions
+    type: mt320_text
+    max: 1
+    entity: mt320_deal
+    column: terms_and_conditions
+  - path: $
+    tag: "14C"
+    name: contract_year
+    type: mt320_text
+    max: 1
+    entity: mt320_deal
+    column: contract_year
+  - path: B
+    tag: "17R"
+    name: b_party_a_role
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: party_a_role
+  - path: B
+    tag: "30T"
+    name: b_trade_date
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: trade_date
+  - path: B
+    tag: "30V"
+    name: b_value_date
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: value_date
+  - path: B
+    tag: "30P"
+    name: b_maturity_date
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: maturity_date
+  - path: B
+    tag: "32B"
+    name: b_principal_amount
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: principal_amount
+  - path: B
+    tag: "30X"
+    name: b_next_interest_due
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: next_interest_due
+  - path: B
+    tag: "34E"
+    name: b_interest_amount
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: interest_amount
+  - path: B
+    tag: "37G"
+    name: b_interest_rate
+    type: mt320_text
+    max: 1
+    entity: mt320_seq_b
+    column: interest_rate
+  - path: B
+    tag: "14D"
+    name: b_day_count_fraction
+    type: mt320_text
+    entity: mt320_seq_b
+    column: day_count_fraction
+  - path: C
+    tag: 53a
+    options: ["A", "D", "J"]
+    name: c_delivery_agent
+    type: mt320_text
+    entity: mt320_seq_c
+    column: delivery_agent
+    render:
+      option: A
+  - path: C
+    tag: 56a
+    options: ["A", "D", "J"]
+    name: c_intermediary
+    type: mt320_text
+    entity: mt320_seq_c
+    column: intermediary
+    render:
+      option: A
+  - path: C
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: c_receiving_agent
+    type: mt320_text
+    entity: mt320_seq_c
+    column: receiving_agent
+    render:
+      option: A
+  - path: C
+    tag: 58a
+    options: ["A", "D", "J"]
+    name: c_beneficiary_institution
+    type: mt320_text
+    entity: mt320_seq_c
+    column: beneficiary_institution
+    render:
+      option: A
+  - path: D
+    tag: 53a
+    options: ["A", "D", "J"]
+    name: d_delivery_agent
+    type: mt320_text
+    entity: mt320_seq_d
+    column: delivery_agent
+    render:
+      option: A
+  - path: D
+    tag: 56a
+    options: ["A", "D", "J"]
+    name: d_intermediary
+    type: mt320_text
+    entity: mt320_seq_d
+    column: intermediary
+    render:
+      option: A
+  - path: D
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: d_receiving_agent
+    type: mt320_text
+    entity: mt320_seq_d
+    column: receiving_agent
+    render:
+      option: A
+  - path: D
+    tag: 58a
+    options: ["A", "D", "J"]
+    name: d_beneficiary_institution
+    type: mt320_text
+    entity: mt320_seq_d
+    column: beneficiary_institution
+    render:
+      option: A

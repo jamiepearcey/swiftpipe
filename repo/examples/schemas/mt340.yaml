@@ -1,0 +1,204 @@
+---
+# MT340 (Forward Rate Agreement Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT340.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt340_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT340
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 3
+    expected_fields: 22
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["14D", "14F", "17F", "18A", "22B", "30F", "30P", "30T", "32B", "37M", "38G"]
+      repeat: true
+    C:
+      anchor_tag: "15C"
+      member_tags: ["57A", "57D", "57J"]
+      repeat: true
+    D:
+      anchor_tag: "15D"
+      member_tags: ["57A", "57D", "57J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt340_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt340_deal
+    column: senders_reference
+  - path: $
+    tag: "21N"
+    name: contract_number
+    type: mt340_text
+    max: 1
+    entity: mt340_deal
+    column: contract_number
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt340_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt340_deal
+    column: type_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt340_text
+    max: 1
+    entity: mt340_deal
+    column: common_reference
+  - path: $
+    tag: "23D"
+    name: party_a_role
+    type: mt340_text
+    max: 1
+    entity: mt340_deal
+    column: party_a_role
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt340_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt340_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt340_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt340_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: "77H"
+    name: governing_agreement
+    type: mt340_text
+    entity: mt340_deal
+    column: governing_agreement
+  - path: $
+    tag: "14C"
+    name: contract_year
+    type: mt340_text
+    max: 1
+    entity: mt340_deal
+    column: contract_year
+  - path: B
+    tag: "30T"
+    name: b_trade_date
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: trade_date
+  - path: B
+    tag: "32B"
+    name: b_notional_amount
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: notional_amount
+  - path: B
+    tag: "30F"
+    name: b_settlement_date
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: settlement_date
+  - path: B
+    tag: "30P"
+    name: b_maturity_date
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: maturity_date
+  - path: B
+    tag: "37M"
+    name: b_fra_rate
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: fra_rate
+  - path: B
+    tag: "14F"
+    name: b_day_count_fraction
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: day_count_fraction
+  - path: B
+    tag: "38G"
+    name: b_contract_period
+    type: mt340_text
+    max: 1
+    entity: mt340_seq_b
+    column: contract_period
+  - path: B
+    tag: "14D"
+    name: b_day_count
+    type: mt340_text
+    entity: mt340_seq_b
+    column: day_count
+  - path: B
+    tag: "17F"
+    name: b_fra_discounting
+    type: mt340_text
+    entity: mt340_seq_b
+    column: fra_discounting
+  - path: B
+    tag: "18A"
+    name: b_number_of_repetitions
+    type: mt340_text
+    entity: mt340_seq_b
+    column: number_of_repetitions
+  - path: B
+    tag: "22B"
+    name: b_fixing_detail
+    type: mt340_text
+    entity: mt340_seq_b
+    column: fixing_detail
+  - path: C
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: c_receiving_agent
+    type: mt340_text
+    entity: mt340_seq_c
+    column: receiving_agent
+    render:
+      option: A
+  - path: D
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: d_receiving_agent
+    type: mt340_text
+    entity: mt340_seq_d
+    column: receiving_agent
+    render:
+      option: A

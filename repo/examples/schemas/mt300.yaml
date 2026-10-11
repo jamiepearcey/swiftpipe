@@ -1,0 +1,295 @@
+---
+# MT300 (Foreign Exchange Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core SWIFTMT300_0000039099_0002.txt. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt300_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT300
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 2
+    expected_fields: 31
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["30T", "30V", "32B", "33B", "36", "53A", "53D", "53J", "56A", "56D", "56J", "57A", "57D", "57J", "58A", "58D", "58J"]
+      repeat: true
+    C:
+      anchor_tag: "15C"
+      member_tags: ["21G", "24D", "26H", "29A", "71F", "84A", "84D", "84J", "85A", "85D", "85J", "88A", "88D", "88J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_deal
+    column: senders_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: related_reference
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_deal
+    column: type_of_operation
+  - path: $
+    tag: "94A"
+    name: scope_of_operation
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: scope_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_deal
+    column: common_reference
+  - path: $
+    tag: "17T"
+    name: block_trade_indicator
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: block_trade_indicator
+  - path: $
+    tag: "17U"
+    name: non_deliverable_indicator
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: non_deliverable_indicator
+  - path: $
+    tag: "17I"
+    name: ndf_open_indicator
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: ndf_open_indicator
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: 83a
+    options: ["A", "D", "J"]
+    name: fund_or_beneficiary
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: fund_or_beneficiary
+    render:
+      option: A
+  - path: $
+    tag: "77H"
+    name: governing_agreement
+    type: mt300_text
+    entity: mt300_deal
+    column: governing_agreement
+  - path: $
+    tag: "77D"
+    name: terms_and_conditions
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: terms_and_conditions
+  - path: $
+    tag: "14C"
+    name: contract_year
+    type: mt300_text
+    max: 1
+    entity: mt300_deal
+    column: contract_year
+  - path: B
+    tag: "30T"
+    name: b_trade_date
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_seq_b
+    column: trade_date
+  - path: B
+    tag: "30V"
+    name: b_value_date
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_seq_b
+    column: value_date
+  - path: B
+    tag: "36"
+    name: b_exchange_rate
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_seq_b
+    column: exchange_rate
+  - path: B
+    tag: "32B"
+    name: b_currency_amount_bought
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_seq_b
+    column: currency_amount_bought
+  - path: B
+    tag: 53a
+    options: ["A", "D", "J"]
+    name: b_delivery_agent
+    type: mt300_text
+    entity: mt300_seq_b
+    column: delivery_agent
+    render:
+      option: A
+  - path: B
+    tag: 56a
+    options: ["A", "D", "J"]
+    name: b_intermediary
+    type: mt300_text
+    entity: mt300_seq_b
+    column: intermediary
+    render:
+      option: A
+  - path: B
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: b_receiving_agent
+    type: mt300_text
+    entity: mt300_seq_b
+    column: receiving_agent
+    render:
+      option: A
+  - path: B
+    tag: "33B"
+    name: b_currency_amount_sold
+    type: mt300_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt300_seq_b
+    column: currency_amount_sold
+  - path: B
+    tag: 58a
+    options: ["A", "D", "J"]
+    name: b_beneficiary_institution
+    type: mt300_text
+    entity: mt300_seq_b
+    column: beneficiary_institution
+    render:
+      option: A
+  - path: C
+    tag: "29A"
+    name: c_contact_information
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: contact_information
+  - path: C
+    tag: "24D"
+    name: c_dealing_method
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: dealing_method
+  - path: C
+    tag: 84a
+    options: ["A", "D", "J"]
+    name: c_dealing_branch_a
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: dealing_branch_a
+    render:
+      option: A
+  - path: C
+    tag: 85a
+    options: ["A", "D", "J"]
+    name: c_dealing_branch_b
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: dealing_branch_b
+    render:
+      option: A
+  - path: C
+    tag: 88a
+    options: ["A", "D", "J"]
+    name: c_broker
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: broker
+    render:
+      option: A
+  - path: C
+    tag: "71F"
+    name: c_broker_commission
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: broker_commission
+  - path: C
+    tag: "26H"
+    name: c_counterparty_reference
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: counterparty_reference
+  - path: C
+    tag: "21G"
+    name: c_broker_reference
+    type: mt300_text
+    max: 1
+    entity: mt300_seq_c
+    column: broker_reference

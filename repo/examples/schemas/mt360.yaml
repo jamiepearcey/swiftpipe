@@ -1,0 +1,304 @@
+---
+# MT360 (Single Currency Interest Rate Derivative Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT360.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt360_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT360
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 4
+    expected_fields: 37
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["14A", "14D", "17F", "18A", "22B", "30F", "37U"]
+      repeat: true
+    D:
+      anchor_tag: "15D"
+      member_tags: ["57A", "57D", "57J"]
+      repeat: true
+    F:
+      anchor_tag: "15F"
+      member_tags: ["14A", "14D", "14F", "14J", "17F", "18A", "22B", "30F", "37R", "38E"]
+      repeat: true
+    G:
+      anchor_tag: "15G"
+      member_tags: ["57A", "57D", "57J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt360_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt360_deal
+    column: senders_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: related_reference
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt360_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt360_deal
+    column: type_of_operation
+  - path: $
+    tag: "94A"
+    name: scope_of_operation
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: scope_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: common_reference
+  - path: $
+    tag: "23A"
+    name: party_a_pays_receives
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: party_a_pays_receives
+  - path: $
+    tag: "21N"
+    name: contract_number
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: contract_number
+  - path: $
+    tag: "30T"
+    name: trade_date
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: trade_date
+  - path: $
+    tag: "30V"
+    name: effective_date
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: effective_date
+  - path: $
+    tag: "30P"
+    name: termination_date
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: termination_date
+  - path: $
+    tag: "14A"
+    name: business_day_convention
+    type: mt360_text
+    entity: mt360_deal
+    column: business_day_convention
+  - path: $
+    tag: "32B"
+    name: notional_amount
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: notional_amount
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt360_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt360_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt360_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt360_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: "77H"
+    name: governing_agreement
+    type: mt360_text
+    entity: mt360_deal
+    column: governing_agreement
+  - path: $
+    tag: "77D"
+    name: terms_and_conditions
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: terms_and_conditions
+  - path: $
+    tag: "14C"
+    name: contract_year
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: contract_year
+  - path: $
+    tag: "72"
+    name: sender_to_receiver_information
+    type: mt360_text
+    max: 1
+    entity: mt360_deal
+    column: sender_to_receiver_information
+  - path: B
+    tag: "37U"
+    name: b_fixed_rate
+    type: mt360_text
+    max: 1
+    entity: mt360_seq_b
+    column: fixed_rate
+  - path: B
+    tag: "18A"
+    name: b_number_of_payments
+    type: mt360_text
+    entity: mt360_seq_b
+    column: number_of_payments
+  - path: B
+    tag: "30F"
+    name: b_payment_date
+    type: mt360_text
+    entity: mt360_seq_b
+    column: payment_date
+  - path: B
+    tag: "17F"
+    name: b_calculation_period
+    type: mt360_text
+    entity: mt360_seq_b
+    column: calculation_period
+  - path: B
+    tag: "14D"
+    name: b_day_count_fraction
+    type: mt360_text
+    entity: mt360_seq_b
+    column: day_count_fraction
+  - path: B
+    tag: "14A"
+    name: b_business_day_convention
+    type: mt360_text
+    entity: mt360_seq_b
+    column: business_day_convention
+  - path: B
+    tag: "22B"
+    name: b_payment_detail
+    type: mt360_text
+    entity: mt360_seq_b
+    column: payment_detail
+  - path: D
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: d_receiving_agent
+    type: mt360_text
+    entity: mt360_seq_d
+    column: receiving_agent
+    render:
+      option: A
+  - path: F
+    tag: "14F"
+    name: f_floating_day_count
+    type: mt360_text
+    max: 1
+    entity: mt360_seq_f
+    column: floating_day_count
+  - path: F
+    tag: "14J"
+    name: f_reset_frequency
+    type: mt360_text
+    max: 1
+    entity: mt360_seq_f
+    column: reset_frequency
+  - path: F
+    tag: "38E"
+    name: f_period_of_floating
+    type: mt360_text
+    max: 1
+    entity: mt360_seq_f
+    column: period_of_floating
+  - path: F
+    tag: "18A"
+    name: f_number_of_payments
+    type: mt360_text
+    entity: mt360_seq_f
+    column: number_of_payments
+  - path: F
+    tag: "30F"
+    name: f_payment_date
+    type: mt360_text
+    entity: mt360_seq_f
+    column: payment_date
+  - path: F
+    tag: "17F"
+    name: f_calculation_period
+    type: mt360_text
+    entity: mt360_seq_f
+    column: calculation_period
+  - path: F
+    tag: "14D"
+    name: f_day_count_fraction
+    type: mt360_text
+    entity: mt360_seq_f
+    column: day_count_fraction
+  - path: F
+    tag: "14A"
+    name: f_business_day_convention
+    type: mt360_text
+    entity: mt360_seq_f
+    column: business_day_convention
+  - path: F
+    tag: "22B"
+    name: f_payment_detail
+    type: mt360_text
+    entity: mt360_seq_f
+    column: payment_detail
+  - path: F
+    tag: "37R"
+    name: f_floating_rate
+    type: mt360_text
+    max: 1
+    entity: mt360_seq_f
+    column: floating_rate
+  - path: G
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: g_receiving_agent
+    type: mt360_text
+    entity: mt360_seq_g
+    column: receiving_agent
+    render:
+      option: A

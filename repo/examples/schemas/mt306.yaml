@@ -1,0 +1,266 @@
+---
+# MT306 (Foreign Currency Option Confirmation (Exotic)) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT306.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt306_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT306
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 4
+    expected_fields: 30
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["17V", "29E", "30F", "30T", "30V", "30X", "34B", "84A", "84D", "84J"]
+      repeat: true
+    C:
+      anchor_tag: "15C"
+      member_tags: ["57A", "57D", "57J"]
+      repeat: true
+    D:
+      anchor_tag: "15D"
+      member_tags: ["26F", "32B", "33B", "36"]
+      repeat: true
+    F:
+      anchor_tag: "15F"
+      member_tags: ["22G", "29J", "29K", "30G", "37J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt306_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt306_deal
+    column: senders_reference
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: type_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: common_reference
+  - path: $
+    tag: "21N"
+    name: contract_number
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: contract_number
+  - path: $
+    tag: "12F"
+    name: option_style
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: option_style
+  - path: $
+    tag: "12E"
+    name: expiry_style
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: expiry_style
+  - path: $
+    tag: "17A"
+    name: barrier_indicator
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: barrier_indicator
+  - path: $
+    tag: "17F"
+    name: payout_indicator
+    type: mt306_text
+    entity: mt306_deal
+    column: payout_indicator
+  - path: $
+    tag: "22K"
+    name: type_of_option
+    type: mt306_text
+    max: 1
+    entity: mt306_deal
+    column: type_of_option
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt306_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt306_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt306_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt306_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: "77H"
+    name: governing_agreement
+    type: mt306_text
+    entity: mt306_deal
+    column: governing_agreement
+  - path: B
+    tag: "17V"
+    name: b_buy_sell
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: buy_sell
+  - path: B
+    tag: "30T"
+    name: b_trade_date
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: trade_date
+  - path: B
+    tag: "30X"
+    name: b_expiry_date
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: expiry_date
+  - path: B
+    tag: "29E"
+    name: b_expiry_location
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: expiry_location
+  - path: B
+    tag: "30F"
+    name: b_payment_date
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: payment_date
+  - path: B
+    tag: "30V"
+    name: b_value_date
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: value_date
+  - path: B
+    tag: "34B"
+    name: b_premium
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: premium
+  - path: B
+    tag: 84a
+    options: ["A", "D", "J"]
+    name: b_dealing_branch
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_b
+    column: dealing_branch
+    render:
+      option: A
+  - path: C
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: c_receiving_agent
+    type: mt306_text
+    entity: mt306_seq_c
+    column: receiving_agent
+    render:
+      option: A
+  - path: D
+    tag: "26F"
+    name: d_settlement_type
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_d
+    column: settlement_type
+  - path: D
+    tag: "32B"
+    name: d_call_amount
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_d
+    column: call_amount
+  - path: D
+    tag: "36"
+    name: d_strike_price
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_d
+    column: strike_price
+  - path: D
+    tag: "33B"
+    name: d_put_amount
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_d
+    column: put_amount
+  - path: F
+    tag: "22G"
+    name: f_barrier_type
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_f
+    column: barrier_type
+  - path: F
+    tag: "37J"
+    name: f_barrier_level
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_f
+    column: barrier_level
+  - path: F
+    tag: "30G"
+    name: f_barrier_start
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_f
+    column: barrier_start
+  - path: F
+    tag: "29J"
+    name: f_barrier_end
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_f
+    column: barrier_end
+  - path: F
+    tag: "29K"
+    name: f_barrier_location
+    type: mt306_text
+    max: 1
+    entity: mt306_seq_f
+    column: barrier_location

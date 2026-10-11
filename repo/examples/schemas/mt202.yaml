@@ -1,0 +1,124 @@
+---
+# MT202 (General Financial Institution Transfer) — starter schema per the SWIFT User Handbook field list;
+# fields captured verbatim, decoded downstream. Not a licensed SRU import;
+# network validation rules are not reproduced.
+field_types:
+- name: mt202_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT202
+  category: payments
+  version: starter
+  coverage:
+    source: SWIFT User Handbook field list; not a licensed SRU import.
+    exact: false
+    expected_sequences: 0
+    expected_fields: 11
+    notes:
+    - "Flat message; MT202 COV (Sequence B underlying customer credit transfer) not modelled."
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt202_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt202_message
+    column: transaction_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt202_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt202_message
+    column: related_reference
+  - path: $
+    tag: "13C"
+    name: time_indication
+    type: mt202_text
+    entity: mt202_message
+    column: time_indication
+  - path: $
+    tag: "32A"
+    name: value_date_currency_amount
+    type: mt202_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt202_message
+    column: value_date_currency_amount
+  - path: $
+    tag: 52a
+    options: ["A", "D"]
+    name: ordering_institution
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: ordering_institution
+    render:
+      option: A
+  - path: $
+    tag: 53a
+    options: ["A", "B", "D"]
+    name: senders_correspondent
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: senders_correspondent
+    render:
+      option: A
+  - path: $
+    tag: 54a
+    options: ["A", "B", "D"]
+    name: receivers_correspondent
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: receivers_correspondent
+    render:
+      option: A
+  - path: $
+    tag: 56a
+    options: ["A", "D"]
+    name: intermediary
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: intermediary
+    render:
+      option: A
+  - path: $
+    tag: 57a
+    options: ["A", "B", "D"]
+    name: account_with_institution
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: account_with_institution
+    render:
+      option: A
+  - path: $
+    tag: 58a
+    options: ["A", "D"]
+    name: beneficiary_institution
+    type: mt202_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt202_message
+    column: beneficiary_institution
+    render:
+      option: A
+  - path: $
+    tag: "72"
+    name: sender_to_receiver_information
+    type: mt202_text
+    max: 1
+    entity: mt202_message
+    column: sender_to_receiver_information

@@ -1,0 +1,241 @@
+---
+# MT101 (Request for Transfer, SWIFT Category 1). Sequence A (general) is flat;
+# Sequence B (transactions) has no :16R:/:16S: wrapper — each occurrence starts
+# at :21: (anchored sequence, ADR-0013). Fixtures: prowide-core MT101.fin.
+field_types:
+- name: mt101_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT101
+  category: payments
+  version: starter
+  coverage:
+    source: SWIFT Category 1 MT101 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 1
+    expected_fields: 26
+    notes:
+    - "Sequence B anchored on :21:; no network validation rules reproduced."
+  sequences:
+    TXN:
+      anchor_tag: "21"
+      member_tags: ["21F", "23E", "32B", "50a", "52a", "56a", "57a", "59", "59a", "70", "77B", "33B", "71A", "71F", "25A", "36"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: sender_reference
+    type: mt101_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt101_request
+    column: sender_reference
+  - path: $
+    tag: "21R"
+    name: customer_specified_reference
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: customer_reference
+  - path: $
+    tag: "28D"
+    name: message_index_total
+    type: mt101_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt101_request
+    column: message_index
+  - path: $
+    tag: 50a
+    options: ["C", "L"]
+    name: instructing_party
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: instructing_party
+    render:
+      option: C
+  - path: $
+    tag: 50a
+    options: ["F", "G", "H"]
+    name: ordering_customer
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: ordering_customer
+    render:
+      option: F
+  - path: $
+    tag: 52a
+    options: ["A", "C"]
+    name: account_servicing_institution
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: account_servicing
+    render:
+      option: A
+  - path: $
+    tag: "51A"
+    name: sending_institution
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: sending_institution
+  - path: $
+    tag: "30"
+    name: requested_execution_date
+    type: mt101_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt101_request
+    column: execution_date
+  - path: $
+    tag: "25"
+    name: authorisation
+    type: mt101_text
+    max: 1
+    entity: mt101_request
+    column: authorisation
+  - path: TXN
+    tag: "21"
+    name: transaction_reference
+    type: mt101_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt101_request_txn
+    column: transaction_reference
+  - path: TXN
+    tag: "21F"
+    name: f_x_reference
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: fx_reference
+  - path: TXN
+    tag: "23E"
+    name: instruction_code
+    type: mt101_text
+    entity: mt101_request_txn
+    column: instruction_code
+  - path: TXN
+    tag: "32B"
+    name: currency_amount
+    type: mt101_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt101_request_txn
+    column: currency_amount
+  - path: TXN
+    tag: 50a
+    options: ["C", "L", "F", "G", "H"]
+    name: txn_ordering_customer
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: ordering_customer
+    render:
+      option: C
+  - path: TXN
+    tag: 52a
+    options: ["A", "C"]
+    name: txn_account_servicing_institution
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: account_servicing
+    render:
+      option: A
+  - path: TXN
+    tag: 56a
+    options: ["A", "C", "D"]
+    name: intermediary
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: intermediary
+    render:
+      option: A
+  - path: TXN
+    tag: 57a
+    options: ["A", "C", "D"]
+    name: account_with_institution
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: account_with
+    render:
+      option: A
+  - path: TXN
+    tag: "59"
+    name: beneficiary
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: beneficiary
+  - path: TXN
+    tag: 59a
+    options: ["A", "F"]
+    name: beneficiary_option
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: beneficiary_option
+    render:
+      option: A
+  - path: TXN
+    tag: "70"
+    name: remittance_information
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: remittance
+  - path: TXN
+    tag: "77B"
+    name: regulatory_reporting
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: regulatory_reporting
+  - path: TXN
+    tag: "33B"
+    name: original_ordered_amount
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: original_amount
+  - path: TXN
+    tag: "71A"
+    name: details_of_charges
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: charges_details
+  - path: TXN
+    tag: "71F"
+    name: senders_charges
+    type: mt101_text
+    entity: mt101_request_txn
+    column: senders_charges
+  - path: TXN
+    tag: "25A"
+    name: charges_account
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: charges_account
+  - path: TXN
+    tag: "36"
+    name: exchange_rate
+    type: mt101_text
+    max: 1
+    entity: mt101_request_txn
+    column: exchange_rate

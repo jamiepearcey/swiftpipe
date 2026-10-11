@@ -1,0 +1,47 @@
+---
+# MT299 (Free Format Message) — starter schema per the SWIFT User Handbook field list;
+# fields captured verbatim, decoded downstream. Not a licensed SRU import;
+# network validation rules are not reproduced.
+field_types:
+- name: mt299_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT299
+  category: payments
+  version: starter
+  coverage:
+    source: SWIFT User Handbook field list; not a licensed SRU import.
+    exact: false
+    expected_sequences: 0
+    expected_fields: 3
+    notes:
+    - "Free-format narrative."
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt299_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt299_message
+    column: transaction_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt299_text
+    max: 1
+    entity: mt299_message
+    column: related_reference
+  - path: $
+    tag: "79"
+    name: narrative
+    type: mt299_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt299_message
+    column: narrative

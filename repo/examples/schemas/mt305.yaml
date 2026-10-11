@@ -1,0 +1,150 @@
+---
+# MT305 (Foreign Currency Option Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT305.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt305_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT305
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 0
+    expected_fields: 16
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt305_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt305_deal
+    column: senders_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: related_reference
+  - path: $
+    tag: "22"
+    name: code_of_operation
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: code_of_operation
+  - path: $
+    tag: "23"
+    name: option_type
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: option_type
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt305_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt305_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt305_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt305_deal
+    column: party_b
+    render:
+      option: A
+  - path: $
+    tag: "30"
+    name: trade_date
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: trade_date
+  - path: $
+    tag: "31G"
+    name: start_of_exercise_period
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: start_of_exercise_period
+  - path: $
+    tag: "31E"
+    name: expiry_date
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: expiry_date
+  - path: $
+    tag: "26F"
+    name: settlement_type
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: settlement_type
+  - path: $
+    tag: "32B"
+    name: currency_and_amount
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: currency_and_amount
+  - path: $
+    tag: "36"
+    name: strike_price
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: strike_price
+  - path: $
+    tag: "33B"
+    name: counter_currency_amount
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: counter_currency_amount
+  - path: $
+    tag: "37K"
+    name: premium_rate
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: premium_rate
+  - path: $
+    tag: "34P"
+    name: premium_payment
+    type: mt305_text
+    max: 1
+    entity: mt305_deal
+    column: premium_payment
+  - path: $
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: receiving_agent
+    type: mt305_text
+    entity: mt305_deal
+    column: receiving_agent
+    render:
+      option: A

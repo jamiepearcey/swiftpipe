@@ -1,0 +1,101 @@
+---
+# MT210 (Notice to Receive) — starter schema per the SWIFT User Handbook field list;
+# fields captured verbatim, decoded downstream. Not a licensed SRU import;
+# network validation rules are not reproduced.
+# Repeating groups have no :16R:/:16S: wrapper: anchored sequences (ADR-0013).
+field_types:
+- name: mt210_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT210
+  category: payments
+  version: starter
+  coverage:
+    source: SWIFT User Handbook field list; not a licensed SRU import.
+    exact: false
+    expected_sequences: 1
+    expected_fields: 8
+    notes:
+    - "Sequence B repeats per :21:."
+  sequences:
+    B:
+      anchor_tag: "21"
+      member_tags: ["32B", "50C", "50F", "52A", "52D", "56A", "56D"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt210_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt210_message
+    column: transaction_reference
+  - path: $
+    tag: "25"
+    name: account_identification
+    type: mt210_text
+    max: 1
+    entity: mt210_message
+    column: account_identification
+  - path: $
+    tag: "30"
+    name: value_date
+    type: mt210_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt210_message
+    column: value_date
+  - path: B
+    tag: "21"
+    name: b_related_reference
+    type: mt210_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt210_b
+    column: related_reference
+  - path: B
+    tag: "32B"
+    name: b_currency_amount
+    type: mt210_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt210_b
+    column: currency_amount
+  - path: B
+    tag: 50a
+    options: ["C", "F"]
+    name: b_ordering_customer
+    type: mt210_text
+    max: 1
+    entity: mt210_b
+    column: ordering_customer
+    render:
+      option: C
+  - path: B
+    tag: 52a
+    options: ["A", "D"]
+    name: b_ordering_institution
+    type: mt210_text
+    max: 1
+    entity: mt210_b
+    column: ordering_institution
+    render:
+      option: A
+  - path: B
+    tag: 56a
+    options: ["A", "D"]
+    name: b_intermediary
+    type: mt210_text
+    max: 1
+    entity: mt210_b
+    column: intermediary
+    render:
+      option: A

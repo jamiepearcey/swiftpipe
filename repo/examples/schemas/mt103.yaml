@@ -1,0 +1,235 @@
+---
+# MT103 (Single Customer Credit Transfer, SWIFT Category 1) — flat message, no
+# :16R:/:16S: sequences. Field list per the SWIFT Category 1 User Handbook
+# (single-sequence MT103); each field is captured verbatim and decoded
+# downstream. Fixtures: Prowide Core examples (mt103.txt/.rje/.dos) and
+# prowide-core MT103 ack variants — see examples/public-swift-samples/upstream.
+# Options 59 (no option) and 59a (A/F) are separate rules because the wire tag
+# carries no option letter for the plain account/name form.
+field_types:
+- name: mt103_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT103
+  category: payments
+  version: starter
+  coverage:
+    source: SWIFT Category 1 MT103 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 0
+    expected_fields: 25
+    notes:
+    - "Single sequence; no network validation rules (C/D rules) reproduced."
+    - "Field 59 without option and 59a with option A/F are modelled as two rules."
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: reference
+  - path: $
+    tag: "13C"
+    name: time_indication
+    type: mt103_text
+    entity: mt103_payment
+    column: time_indication
+  - path: $
+    tag: "23B"
+    name: bank_operation_code
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: bank_operation_code
+  - path: $
+    tag: "23E"
+    name: instruction_code
+    type: mt103_text
+    entity: mt103_payment
+    column: instruction_code
+  - path: $
+    tag: "26T"
+    name: transaction_type_code
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: transaction_type_code
+  - path: $
+    tag: "32A"
+    name: value_date_currency_amount
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: value_date_amount
+  - path: $
+    tag: "33B"
+    name: instructed_amount
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: instructed_amount
+  - path: $
+    tag: "36"
+    name: exchange_rate
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: exchange_rate
+  - path: $
+    tag: 50a
+    options: ["A", "F", "K"]
+    name: ordering_customer
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: ordering_customer
+    render:
+      option: A
+  - path: $
+    tag: "51A"
+    name: sending_institution
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: sending_institution
+  - path: $
+    tag: 52a
+    options: ["A", "D"]
+    name: ordering_institution
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: ordering_institution
+    render:
+      option: A
+  - path: $
+    tag: 53a
+    options: ["A", "B", "D"]
+    name: senders_correspondent
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: senders_correspondent
+    render:
+      option: A
+  - path: $
+    tag: 54a
+    options: ["A", "B", "D"]
+    name: receivers_correspondent
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: receivers_correspondent
+    render:
+      option: A
+  - path: $
+    tag: 55a
+    options: ["A", "B", "D"]
+    name: third_reimbursement_institution
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: third_reimbursement
+    render:
+      option: A
+  - path: $
+    tag: 56a
+    options: ["A", "C", "D"]
+    name: intermediary_institution
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: intermediary
+    render:
+      option: A
+  - path: $
+    tag: 57a
+    options: ["A", "B", "C", "D"]
+    name: account_with_institution
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: account_with
+    render:
+      option: A
+  - path: $
+    tag: "59"
+    name: beneficiary_customer
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: beneficiary
+  - path: $
+    tag: 59a
+    options: ["A", "F"]
+    name: beneficiary_customer_option
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: beneficiary_option
+    render:
+      option: A
+  - path: $
+    tag: "70"
+    name: remittance_information
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: remittance
+  - path: $
+    tag: "71A"
+    name: details_of_charges
+    type: mt103_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt103_payment
+    column: charges_details
+  - path: $
+    tag: "71F"
+    name: senders_charges
+    type: mt103_text
+    entity: mt103_payment
+    column: senders_charges
+  - path: $
+    tag: "71G"
+    name: receivers_charges
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: receivers_charges
+  - path: $
+    tag: "72"
+    name: sender_to_receiver_information
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: sender_to_receiver
+  - path: $
+    tag: "77B"
+    name: regulatory_reporting
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: regulatory_reporting
+  - path: $
+    tag: "77T"
+    name: envelope_contents
+    type: mt103_text
+    max: 1
+    entity: mt103_payment
+    column: envelope_contents

@@ -1,0 +1,107 @@
+---
+# MT950 (Statement Message) — starter schema per the SWIFT User Handbook field list;
+# fields captured verbatim, decoded downstream. Not a licensed SRU import;
+# network validation rules are not reproduced.
+# Repeating groups have no :16R:/:16S: wrapper: anchored sequences (ADR-0013).
+field_types:
+- name: mt950_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT950
+  category: cash
+  version: starter
+  coverage:
+    source: SWIFT User Handbook field list; not a licensed SRU import.
+    exact: false
+    expected_sequences: 1
+    expected_fields: 8
+    notes:
+    - "Statement lines anchored on :61: (optional :86: not used in MT950)."
+  sequences:
+    ENTRY:
+      anchor_tag: "61"
+      member_tags: ["86"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt950_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt950_message
+    column: transaction_reference
+  - path: $
+    tag: "25"
+    name: account_identification
+    type: mt950_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt950_message
+    column: account_identification
+  - path: $
+    tag: "28C"
+    name: statement_number
+    type: mt950_text
+    max: 1
+    entity: mt950_message
+    column: statement_number
+  - path: $
+    tag: "28"
+    name: statement_number_legacy
+    type: mt950_text
+    max: 1
+    entity: mt950_message
+    column: statement_number_legacy
+  - path: $
+    tag: 60a
+    options: ["F", "M"]
+    name: opening_balance
+    type: mt950_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt950_message
+    column: opening_balance
+    render:
+      option: F
+  - path: $
+    tag: 62a
+    options: ["F", "M"]
+    name: closing_balance
+    type: mt950_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt950_message
+    column: closing_balance
+    render:
+      option: F
+  - path: $
+    tag: "64"
+    name: closing_available_balance
+    type: mt950_text
+    max: 1
+    entity: mt950_message
+    column: closing_available_balance
+  - path: ENTRY
+    tag: "61"
+    name: entry_statement_line
+    type: mt950_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt950_entry
+    column: statement_line
+  - path: ENTRY
+    tag: "86"
+    name: entry_entry_narrative
+    type: mt950_text
+    max: 1
+    entity: mt950_entry
+    column: entry_narrative

@@ -1,0 +1,82 @@
+---
+# MT900 (Confirmation of Debit) — starter schema per the SWIFT User Handbook field list;
+# fields captured verbatim, decoded downstream. Not a licensed SRU import;
+# network validation rules are not reproduced.
+field_types:
+- name: mt900_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT900
+  category: cash
+  version: starter
+  coverage:
+    source: SWIFT User Handbook field list; not a licensed SRU import.
+    exact: false
+    expected_sequences: 0
+    expected_fields: 7
+    notes:
+    - "Flat message."
+  fields:
+  - path: $
+    tag: "20"
+    name: transaction_reference
+    type: mt900_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt900_message
+    column: transaction_reference
+  - path: $
+    tag: "21"
+    name: related_reference
+    type: mt900_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt900_message
+    column: related_reference
+  - path: $
+    tag: "25"
+    name: account_identification
+    type: mt900_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt900_message
+    column: account_identification
+  - path: $
+    tag: "13D"
+    name: date_time_indication
+    type: mt900_text
+    max: 1
+    entity: mt900_message
+    column: date_time_indication
+  - path: $
+    tag: "32A"
+    name: value_date_currency_amount
+    type: mt900_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt900_message
+    column: value_date_currency_amount
+  - path: $
+    tag: 52a
+    options: ["A", "D"]
+    name: ordering_institution
+    type: mt900_text
+    max: 1
+    entity: mt900_message
+    column: ordering_institution
+    render:
+      option: A
+  - path: $
+    tag: "72"
+    name: sender_to_receiver_information
+    type: mt900_text
+    max: 1
+    entity: mt900_message
+    column: sender_to_receiver_information

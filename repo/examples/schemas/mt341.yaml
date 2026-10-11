@@ -1,0 +1,154 @@
+---
+# MT341 (Forward Rate Agreement Settlement Confirmation) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT341.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt341_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT341
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 2
+    expected_fields: 15
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    B:
+      anchor_tag: "15B"
+      member_tags: ["30F", "30P", "30T", "32B", "37M"]
+      repeat: true
+    C:
+      anchor_tag: "15C"
+      member_tags: ["34E", "37R", "57A", "57D", "57J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt341_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt341_deal
+    column: senders_reference
+  - path: $
+    tag: "21N"
+    name: contract_number
+    type: mt341_text
+    max: 1
+    entity: mt341_deal
+    column: contract_number
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt341_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt341_deal
+    column: type_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt341_text
+    max: 1
+    entity: mt341_deal
+    column: common_reference
+  - path: $
+    tag: "23D"
+    name: party_a_role
+    type: mt341_text
+    max: 1
+    entity: mt341_deal
+    column: party_a_role
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt341_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt341_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt341_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt341_deal
+    column: party_b
+    render:
+      option: A
+  - path: B
+    tag: "30T"
+    name: b_trade_date
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_b
+    column: trade_date
+  - path: B
+    tag: "32B"
+    name: b_notional_amount
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_b
+    column: notional_amount
+  - path: B
+    tag: "30F"
+    name: b_settlement_date
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_b
+    column: settlement_date
+  - path: B
+    tag: "30P"
+    name: b_maturity_date
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_b
+    column: maturity_date
+  - path: B
+    tag: "37M"
+    name: b_fra_rate
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_b
+    column: fra_rate
+  - path: C
+    tag: "37R"
+    name: c_fixing_rate
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_c
+    column: fixing_rate
+  - path: C
+    tag: "34E"
+    name: c_settlement_amount
+    type: mt341_text
+    max: 1
+    entity: mt341_seq_c
+    column: settlement_amount
+  - path: C
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: c_receiving_agent
+    type: mt341_text
+    entity: mt341_seq_c
+    column: receiving_agent
+    render:
+      option: A

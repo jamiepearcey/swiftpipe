@@ -1,0 +1,185 @@
+---
+# MT362 (Interest Rate Reset/Advice of Payment) — starter schema. Sequence A is root-level; each later
+# sequence is introduced by an empty `:15x:` marker tag with NO :16R:/:16S:
+# wrapper, so each is an *anchored* sequence (ADR-0013) whose members are the
+# tags listed below. Fixture: prowide-core MT362.fin. Not a licensed SRU import; network
+# validation rules are not reproduced.
+field_types:
+- name: mt362_text
+  pattern:
+  - kind: rest
+    name: value
+
+messages:
+- message: MT362
+  category: treasury
+  version: starter
+  coverage:
+    source: SWIFT Category 3 field list per SWIFT User Handbook; not a licensed SRU import.
+    exact: false
+    expected_sequences: 2
+    expected_fields: 20
+    notes:
+    - "Sequences anchored on empty :15x: markers; member tags per public fixtures and handbook."
+  sequences:
+    D:
+      anchor_tag: "15D"
+      member_tags: ["30F", "30X", "33F", "37G", "37M", "37R"]
+      repeat: true
+    E:
+      anchor_tag: "15E"
+      member_tags: ["18A", "30F", "32M", "57A", "57D", "57J"]
+      repeat: true
+  fields:
+  - path: $
+    tag: "20"
+    name: senders_reference
+    type: mt362_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt362_deal
+    column: senders_reference
+  - path: $
+    tag: "22A"
+    name: type_of_operation
+    type: mt362_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt362_deal
+    column: type_of_operation
+  - path: $
+    tag: "94A"
+    name: scope_of_operation
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: scope_of_operation
+  - path: $
+    tag: "22C"
+    name: common_reference
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: common_reference
+  - path: $
+    tag: "23A"
+    name: party_a_pays_receives
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: party_a_pays_receives
+  - path: $
+    tag: "21N"
+    name: contract_number
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: contract_number
+  - path: $
+    tag: "30V"
+    name: effective_date
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: effective_date
+  - path: $
+    tag: "30P"
+    name: termination_date
+    type: mt362_text
+    max: 1
+    entity: mt362_deal
+    column: termination_date
+  - path: $
+    tag: 82a
+    options: ["A", "D", "J"]
+    name: party_a
+    type: mt362_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt362_deal
+    column: party_a
+    render:
+      option: A
+  - path: $
+    tag: 87a
+    options: ["A", "D", "J"]
+    name: party_b
+    type: mt362_text
+    required: true
+    min: 1
+    max: 1
+    entity: mt362_deal
+    column: party_b
+    render:
+      option: A
+  - path: D
+    tag: "33F"
+    name: d_currency_and_notional
+    type: mt362_text
+    max: 1
+    entity: mt362_seq_d
+    column: currency_and_notional
+  - path: D
+    tag: "30X"
+    name: d_next_reset_date
+    type: mt362_text
+    max: 1
+    entity: mt362_seq_d
+    column: next_reset_date
+  - path: D
+    tag: "37G"
+    name: d_interest_rate
+    type: mt362_text
+    max: 1
+    entity: mt362_seq_d
+    column: interest_rate
+  - path: D
+    tag: "37R"
+    name: d_fixing_rate
+    type: mt362_text
+    max: 1
+    entity: mt362_seq_d
+    column: fixing_rate
+  - path: D
+    tag: "37M"
+    name: d_margin
+    type: mt362_text
+    max: 1
+    entity: mt362_seq_d
+    column: margin
+  - path: D
+    tag: "30F"
+    name: d_payment_date
+    type: mt362_text
+    entity: mt362_seq_d
+    column: payment_date
+  - path: E
+    tag: "18A"
+    name: e_number_of_payments
+    type: mt362_text
+    entity: mt362_seq_e
+    column: number_of_payments
+  - path: E
+    tag: "30F"
+    name: e_payment_date
+    type: mt362_text
+    entity: mt362_seq_e
+    column: payment_date
+  - path: E
+    tag: "32M"
+    name: e_payment_amount
+    type: mt362_text
+    entity: mt362_seq_e
+    column: payment_amount
+  - path: E
+    tag: 57a
+    options: ["A", "D", "J"]
+    name: e_receiving_agent
+    type: mt362_text
+    entity: mt362_seq_e
+    column: receiving_agent
+    render:
+      option: A

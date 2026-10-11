@@ -133,6 +133,17 @@ messages:
       PENDET:
         parent: PENACOUNT
         repeat: true
+      ADDINFO:
+        repeat: true
+      CALDET:
+        parent: PENDET
+        repeat: true
+      FIA:
+        parent: CALDET
+        repeat: true
+      RELTRAN:
+        parent: PENDET
+        repeat: true
     fields:
       - path: GENL
         tag: 20C
