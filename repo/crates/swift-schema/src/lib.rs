@@ -209,6 +209,10 @@ pub struct SequenceSchema {
     /// `swift_core::AnchoredSequence`.
     #[serde(default)]
     pub anchor_tag: Option<String>,
+    /// Further tags that also start a new occurrence of this sequence (e.g. MT801's
+    /// `51A`/`51C` loop). Only meaningful when `anchor_tag` is set.
+    #[serde(default)]
+    pub alt_anchor_tags: Vec<String>,
     /// Tags other than `anchor_tag` that belong to the current occurrence
     /// (e.g. `["86"]`). Only meaningful when `anchor_tag` is set.
     #[serde(default)]
@@ -223,13 +227,15 @@ pub fn anchored_sequences(schema: &MessageSchema) -> Vec<swift_core::AnchoredSeq
     schema
         .sequences
         .iter()
-        .filter_map(|(name, seq)| {
-            let anchor_tag = seq.anchor_tag.as_deref()?;
-            Some(swift_core::AnchoredSequence {
-                name: name.as_bytes(),
-                anchor_tag: anchor_tag.as_bytes(),
-                member_tags: seq.member_tags.iter().map(String::as_bytes).collect(),
-            })
+        .filter_map(|(name, seq)| Some((name, seq, seq.anchor_tag.as_deref()?)))
+        .flat_map(|(name, seq, anchor_tag)| {
+            std::iter::once(anchor_tag)
+                .chain(seq.alt_anchor_tags.iter().map(String::as_str))
+                .map(move |anchor| swift_core::AnchoredSequence {
+                    name: name.as_bytes(),
+                    anchor_tag: anchor.as_bytes(),
+                    member_tags: seq.member_tags.iter().map(String::as_bytes).collect(),
+                })
         })
         .collect()
 }
@@ -704,6 +710,7 @@ pub fn match_message<'schema, 'parsed, 'input>(
             &observed_scopes[index],
             &rule_counts[index],
             rule.min.or(if rule.required { Some(1) } else { None }),
+            rule.path == "$",
         );
         for scope in scopes {
             let actual = rule_counts[index].get(&scope).copied().unwrap_or(0);
@@ -817,11 +824,14 @@ fn cardinality_scopes(
     observed: &BTreeSet<Option<String>>,
     counts: &BTreeMap<Option<String>, u16>,
     min: Option<u16>,
+    root_rule: bool,
 ) -> BTreeSet<Option<String>> {
     let mut scopes = BTreeSet::new();
     scopes.extend(observed.iter().cloned());
     scopes.extend(counts.keys().cloned());
-    if scopes.is_empty() && min.unwrap_or(0) > 0 {
+    // A rule inside a sequence is only owed per observed occurrence; an absent
+    // sequence is judged by the sequence's own min, not by its member fields.
+    if scopes.is_empty() && root_rule && min.unwrap_or(0) > 0 {
         scopes.insert(None);
     }
     scopes

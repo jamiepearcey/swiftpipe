@@ -167,6 +167,99 @@ impl<'a> ParsedMessage<'a> {
     }
 }
 
+/// Split a file holding several FIN messages into one slice per message.
+///
+/// Handles concatenated messages, RJE `$` separators, SOH/ETX framing and
+/// surrounding whitespace. A message starts at a `{1:` that is at the start of
+/// the input or follows a closing `}` (optionally after `$`/whitespace/control
+/// bytes). Fragments without a `{2:` application header (bare ACK/NAK system
+/// envelopes such as `{1:F21..}{4:{177:..}{451:0}}`) are dropped; the ACK prefix
+/// that precedes a message in the same envelope is therefore not part of it.
+pub fn split_messages(input: &[u8]) -> Vec<&[u8]> {
+    let mut starts = Vec::new();
+    let mut prev_closed = true;
+    let mut i = 0;
+    while i < input.len() {
+        let b = input[i];
+        if input[i..].starts_with(b"{1:") && prev_closed {
+            starts.push(i);
+        }
+        if !(b == b'$' || b.is_ascii_whitespace() || b == 0x01 || b == 0x03) {
+            prev_closed = b == b'}';
+        }
+        i += 1;
+    }
+    let mut out = Vec::new();
+    for (n, &start) in starts.iter().enumerate() {
+        let end = starts.get(n + 1).copied().unwrap_or(input.len());
+        let mut frag = &input[start..end];
+        while let Some((&last, rest)) = frag.split_last() {
+            if last == b'$' || last.is_ascii_whitespace() || last == 0x01 || last == 0x03 {
+                frag = rest;
+            } else {
+                break;
+            }
+        }
+        if frag.windows(3).any(|w| w == b"{2:") {
+            out.push(frag);
+        }
+    }
+    out
+}
+
+/// Recover statements from "bare" MT940/MT942 files: bank exports with no
+/// `{1:}{2:}{4:}` envelope (often `.sta`), possibly several statements per file,
+/// optional leading header lines and `-` separators.
+///
+/// A statement starts at each `:20:` line and must carry a `:25:` account. The
+/// type is `942` when it has `:34F:`, `:90D:`/`:90C:` or no `:60a:` opening
+/// balance but a `:13D:`, otherwise `940`. Each statement is wrapped in a
+/// synthetic envelope (`TESTXXXX`-style placeholder BICs), so downstream
+/// parsing is identical to enveloped messages. Returns `(message_type, fin)`.
+pub fn split_bare_statements(input: &[u8]) -> Vec<(&'static str, String)> {
+    let text = String::from_utf8_lossy(input)
+        .replace("\r\n", "\n")
+        .replace('\r', "\n");
+    let mut segments: Vec<Vec<&str>> = Vec::new();
+    for line in text.lines() {
+        if line.starts_with(":20:") {
+            segments.push(vec![line]);
+        } else if let Some(cur) = segments.last_mut() {
+            if line.trim() != "-" && line.trim() != "-}" {
+                cur.push(line);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for seg in segments {
+        let body = seg.join("\n");
+        let body = body.trim_end();
+        let has = |tag: &str| body.lines().any(|l| l.starts_with(tag));
+        if !has(":25:") && !has(":25P:") {
+            continue;
+        }
+        let kind = if has(":34F:") || has(":90D:") || has(":90C:") || (has(":13D:") && !has(":60"))
+        {
+            "942"
+        } else {
+            "940"
+        };
+        out.push((
+            kind,
+            format!("{{1:F01XXXXXXXXAXXX0000000000}}{{2:I{kind}XXXXXXXXXXXXN}}{{4:\n{body}\n-}}"),
+        ));
+    }
+    out
+}
+
+/// Three-digit message type from block 2 (`{2:I540...}` / `{2:O540...}`).
+pub fn message_type_of(message: &[u8]) -> Option<&str> {
+    let at = message.windows(3).position(|w| w == b"{2:")? + 4;
+    std::str::from_utf8(message.get(at..at + 3)?)
+        .ok()
+        .filter(|t| t.bytes().all(|c| c.is_ascii_digit()))
+}
+
 pub fn parse_message(input: &[u8]) -> ParsedMessage<'_> {
     parse_message_with_limits(input, &ParseLimits::default_strict())
 }
@@ -933,6 +1026,60 @@ SECOND LINE
         assert_eq!(rela_fields[0].sequence_path[2].occurrence, 0);
         assert_eq!(rela_fields[1].sequence_path[1].occurrence, 1);
         assert_eq!(rela_fields[1].sequence_path[2].occurrence, 0);
+    }
+
+    #[test]
+    fn splits_multi_message_files() {
+        let one = "{1:F01AAAAGB2LAXXX0000000000}{2:I103BBBBGB2LXXXXN}{4:\n:20:A\n-}";
+        let two = "{1:F01AAAAGB2LAXXX0000000001}{2:I202BBBBGB2LXXXXN}{4:\n:20:B\n-}";
+        let ack = "{1:F21AAAAGB2LAXXX0000000000}{4:{177:1704260717}{451:0}}";
+        let input = format!("{ack}{one}\n$\n{two}\n$\n");
+        let parts = split_messages(input.as_bytes());
+        assert_eq!(parts, vec![one.as_bytes(), two.as_bytes()]);
+        assert_eq!(message_type_of(parts[1]), Some("202"));
+        assert!(split_messages(b"no messages here").is_empty());
+    }
+
+    #[test]
+    fn split_messages_edge_cases() {
+        let m = "{1:F01AAAAGB2LAXXX0000000001}{2:I202BBBBGB2LXXXXN}{4:\r\n:20:A\r\n-}";
+        let m2 = "{1:F01AAAAGB2LAXXX0000000002}{2:I103BBBBGB2LXXXXN}{4:\r\n:20:B\r\n-}";
+        // CRLF separators
+        let crlf = format!("{m}\r\n$\r\n{m2}\r\n$\r\n");
+        assert_eq!(
+            split_messages(crlf.as_bytes()),
+            vec![m.as_bytes(), m2.as_bytes()]
+        );
+        // SOH/ETX framing
+        let framed = format!("\x01{m}\x03\x01{m2}\x03");
+        assert_eq!(
+            split_messages(framed.as_bytes()),
+            vec![m.as_bytes(), m2.as_bytes()]
+        );
+        // ACK prefix before a message
+        let ack = "{1:F21AAAAGB2LAXXX0000000000}{4:{177:1704260717}{451:0}}";
+        let prefixed = format!("{ack}{m}");
+        assert_eq!(split_messages(prefixed.as_bytes()), vec![m.as_bytes()]);
+        // trailing `$`
+        let dollar = format!("{m}$");
+        assert_eq!(split_messages(dollar.as_bytes()), vec![m.as_bytes()]);
+        // bare ACK envelope only
+        assert!(split_messages(ack.as_bytes()).is_empty());
+        assert!(split_messages(b"").is_empty());
+    }
+
+    #[test]
+    fn recovers_bare_statements() {
+        let input = b"ABNANL2A\n940\nABNANL2A\n:20:A1\n:25:123\n:28C:1/1\n:60F:C190825EUR1,00\n:61:1908240824D5,34N426NONREF\n:86:X\n:62F:C190826EUR2,00\n-\n:20:B2\r\n:25:456\r\n:34F:EURD0,\r\n:61:1908240824C1,00NTRFNONREF\r\n:90D:1EUR0,\r\n-\r\n:20:NOACCT\n:60F:C190825EUR1,00\n";
+        let got = split_bare_statements(input);
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].0, "940");
+        assert_eq!(got[1].0, "942");
+        assert!(got[0].1.ends_with("EUR2,00\n-}"));
+        let parsed = parse_message(got[1].1.as_bytes());
+        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+        assert_eq!(message_type_of(got[1].1.as_bytes()), Some("942"));
+        assert!(split_bare_statements(b"nothing").is_empty());
     }
 
     #[test]

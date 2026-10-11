@@ -20,15 +20,17 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
-use swift_core::parse_message;
+use swift_core::{
+    message_type_of, parse_message_with_sequences, split_bare_statements, split_messages,
+};
 use swift_db::{
     materialize_message, materialize_structural_message, InboundSource, MigrationSink,
     ParsedOutputBatch, ParsedSink,
 };
 use swift_duckdb::{DuckDbExportFormat, DuckDbExportOptions, DuckDbInboundConfig, DuckDbStore};
 use swift_schema::{
-    infer_database_layout, match_and_parse_message, render_message, FieldPatternStep,
-    RenderEnvelope, RenderRequest, SchemaCatalog,
+    anchored_sequences, infer_database_layout, match_and_parse_message, render_message,
+    FieldPatternStep, RenderEnvelope, RenderRequest, SchemaCatalog,
 };
 
 #[derive(Debug, Parser)]
@@ -44,6 +46,13 @@ enum Command {
     Schema {
         #[command(subcommand)]
         command: SchemaCommand,
+    },
+    /// Split FIN files into messages and insert them into the inbound table.
+    Load {
+        #[arg(short, long, default_value = "swiftpipe.toml")]
+        config: PathBuf,
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
     },
     Migrate {
         #[arg(short, long, default_value = "swiftpipe.toml")]
@@ -237,6 +246,70 @@ fn main() -> Result<()> {
             store.apply_layout(&layout)?;
             println!("migrated {} table(s)", layout.tables.len());
         }
+        Command::Load { config, files } => {
+            let config = load_config(&config)?;
+            ensure_duckdb(&config.source.adapter, "source")?;
+            let conn = Connection::open(&config.source.database).with_context(|| {
+                format!("failed to open DuckDB {}", config.source.database.display())
+            })?;
+            let src = &config.source;
+            let idents = [
+                &src.table,
+                &src.id_column,
+                &src.message_type_column,
+                &src.body_column,
+            ];
+            for name in idents {
+                if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                    bail!("unsafe identifier in source config: {name:?}");
+                }
+            }
+            let processed = src
+                .processed_column
+                .as_deref()
+                .map(|c| format!(", {c} BOOLEAN NOT NULL DEFAULT false"))
+                .unwrap_or_default();
+            conn.execute(
+                &format!(
+                    "CREATE TABLE IF NOT EXISTS {t} ({i} TEXT NOT NULL, {m} TEXT NOT NULL, {b} TEXT NOT NULL{processed})",
+                    t = src.table, i = src.id_column, m = src.message_type_column, b = src.body_column
+                ),
+                [],
+            )?;
+            let insert = format!(
+                "INSERT INTO {} ({}, {}, {}) VALUES (?, ?, ?)",
+                src.table, src.id_column, src.message_type_column, src.body_column
+            );
+            let mut loaded = 0usize;
+            for file in &files {
+                let bytes =
+                    fs::read(file).with_context(|| format!("failed to read {}", file.display()))?;
+                let stem = file
+                    .file_stem()
+                    .map_or_else(|| "msg".to_string(), |s| s.to_string_lossy().into_owned());
+                let mut parts: Vec<(String, String)> = split_messages(&bytes)
+                    .into_iter()
+                    .filter_map(|part| {
+                        let kind = message_type_of(part)?;
+                        Some((
+                            format!("MT{kind}"),
+                            String::from_utf8_lossy(part).into_owned(),
+                        ))
+                    })
+                    .collect();
+                if parts.is_empty() {
+                    parts = split_bare_statements(&bytes)
+                        .into_iter()
+                        .map(|(kind, fin)| (format!("MT{kind}"), fin))
+                        .collect();
+                }
+                for (n, (kind, body)) in parts.into_iter().enumerate() {
+                    conn.execute(&insert, [format!("{stem}-{}", n + 1), kind, body])?;
+                    loaded += 1;
+                }
+            }
+            println!("loaded {loaded} message(s)");
+        }
         Command::Run { config, limit } => {
             let config = load_config(&config)?;
             ensure_duckdb(&config.source.adapter, "source")?;
@@ -260,7 +333,12 @@ fn main() -> Result<()> {
             let mut processed_ids = Vec::new();
 
             for message in &inbound.messages {
-                let parsed = parse_message(message.body.as_bytes());
+                // Schemas with anchored (no :16R:/:16S:) sequences need them at parse time.
+                let anchored = catalog
+                    .message(&message.message_type)
+                    .map(anchored_sequences)
+                    .unwrap_or_default();
+                let parsed = parse_message_with_sequences(message.body.as_bytes(), &anchored);
                 let message_output = match materialize_message(&catalog, message, &parsed) {
                     Ok(output) => output,
                     Err(error) if !config.runtime.fail_on_missing_schema => {
@@ -1059,7 +1137,11 @@ fn validate_rendered_message(
     message_type: &str,
     rendered: &str,
 ) -> Result<()> {
-    let parsed = parse_message(rendered.as_bytes());
+    let anchored = catalog
+        .message(message_type)
+        .map(anchored_sequences)
+        .unwrap_or_default();
+    let parsed = parse_message_with_sequences(rendered.as_bytes(), &anchored);
     if !parsed.diagnostics.is_empty() {
         bail!(
             "rendered message has parse diagnostics: {:?}",
