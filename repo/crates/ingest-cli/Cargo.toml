@@ -17,7 +17,7 @@ serde_json = "1"
 # store via DuckDB. Matches swift-api's duckdb pin so the bundled build is shared.
 axum = "0.7"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "macros", "signal"] }
-duckdb = { version = "1.10501.0", features = ["bundled"] }
+duckdb = { version = "1.10501.0" }
 ingest-core = { path = "../ingest-core" }
 ingest-parquet = { path = "../ingest-parquet" }
 ingest-penalty = { path = "../ingest-penalty" }

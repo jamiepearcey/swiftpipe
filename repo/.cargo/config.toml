@@ -1,0 +1,3 @@
+# Link the installed DuckDB (brew install duckdb, 1.5.2 = libduckdb-sys 1.10502) instead of compiling it.
+[env]
+DUCKDB_LIB_DIR = "/opt/homebrew/opt/duckdb/lib"

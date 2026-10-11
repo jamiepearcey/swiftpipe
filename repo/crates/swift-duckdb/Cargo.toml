@@ -6,7 +6,7 @@ rust-version = "1.82"
 publish = false
 
 [dependencies]
-duckdb = { version = "1.10501.0", features = ["bundled"] }
+duckdb = { version = "1.10501.0" }
 swift-db = { path = "../swift-db" }
 swift-schema = { path = "../swift-schema" }
 
