@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: repo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: repo
+      - name: Test
+        run: >
+          cargo test
+          -p swift-schema -p swift-core -p swift-normalize -p swift-cli
+          -p swift-mt940 -p swift-duckdb -p swift-db -p swift-api
+      - name: Clippy
+        run: cargo clippy -p swift-core -p swift-cli -p swift-schema
+      - name: Validate schemas
+        run: cargo run -q -p swift-cli -- schema render-validate examples/schemas
