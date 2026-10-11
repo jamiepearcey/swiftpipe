@@ -17,7 +17,7 @@ DuckDB inbound table
   -> schema-driven FIN renderer
 ```
 
-Implemented local example schema corpus: 61 MT schemas under `examples/schemas`.
+Implemented local example schema corpus: 212 MT schemas under `examples/schemas` (hand-built securities/treasury/cash, plus 130 starter schemas generated from Prowide Core structures; see `research/prowide-mt-structures.md`).
 
 The bundled schemas are starter schemas, not certified SRU reproductions. Exact
 network-rule reproduction needs licensed SWIFT/ISO source material imported into
@@ -40,6 +40,7 @@ Example commands:
 ```bash
 cargo run -p swift-cli -- schema validate examples/schemas
 cargo run -p swift-cli -- schema render-validate examples/schemas
+cargo run -p swift-cli -- load --config examples/swiftpipe.toml messages.rje other.fin   # split multi-message files into the inbound table
 cargo run -p swift-cli -- migrate --config examples/swiftpipe.toml
 cargo run -p swift-cli -- run --config examples/swiftpipe.toml --limit 10000
 cargo run -p swift-cli -- render --config examples/swiftpipe.toml --message-id msg-1 --validate --output out.fin

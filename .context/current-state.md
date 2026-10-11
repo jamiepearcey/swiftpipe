@@ -39,6 +39,17 @@
 
 ## Recently completed work
 
+- **Upstream fixture ingestion (2026-10-11)**: 467 public references catalogued in
+  `research/swift-message-references.json`; single-message FIN files vendored under
+  `repo/examples/public-swift-samples/upstream/` (provenance in its README) and
+  checked by `crates/swift-schema/tests/upstream_fixtures.rs`. Found and fixed:
+  `match_message` reported required fields of an *absent* sequence as missing at
+  root (MT537 with only PENA, MT940 with no `:61:`); MT537 gained `ADDINFO`,
+  `CALDET`, `FIA`, `RELTRAN` sequences; new starter schemas `mt103.yaml` and
+  `mt101.yaml`. Treasury starter schemas MT300/305/306/320/340/341/360/361/362 added (empty `:15x:` markers
+  as anchored sequences; member tags must be concrete wire tags, e.g. `53A`). Cash starter schemas MT199/200/202/210/299/900/910/942/950 added with synthetic samples
+  (no public files exist; GoPlasmatic scenarios are generator specs, not FIN). `swift_core::split_messages` + `swiftpipe load` split concatenated/RJE/ack-prefixed files into the inbound table (bare ACK envelopes dropped). Open: bare `.sta` MT940 (no envelope) ingest; GoPlasmatic JSON scenarios not used.
+
 - **Review fixes on the CSDR/MT537 work (ADR-0014)**, all five verified against
   the running pipeline rather than by inspection. `swift-normalize` now emits one
   `SecurityEvent` **per transaction** instead of per message — an MT537 carrying
@@ -566,3 +577,7 @@
 - Latest local `swift-schema` layout inference bench passed but Criterion reported a statistically significant median slowdown (`487.27 µs`, `+8.1959%`) against its stored baseline; track before treating as a code regression.
 - Full `repo/ui` dev-tool auditing still reports 2 moderate Vite/esbuild
   findings; the runtime-only `npm audit --omit=dev` gate is clean.
+
+- **Prowide-structure schemas (2026-10-11)**: `repo/scripts/gen-schemas-from-prowide.py` generated 117 starter schemas (payments 1xx/2xx, treasury 3xx, collections 4xx, markets 6xx, trade finance 7xx, 8xx, 9xx incl. MT941/920 etc.) from Prowide Core's message structure docs (Apache-2.0, pinned commit; derived data in `research/prowide-mt-structures.json`). Total 199 schemas. Structural samples in `examples/public-swift-samples/generated/`. Gaps: nested-sequence and loop types (see research md). Field formats still captured verbatim (no per-field format parsing). `load` CLI tests in `crates/swift-cli/tests/load_cli.rs`.
+- **Remaining types closed (2026-10-11)**: MT203/204/304/350/410/412/416/420/422/600/601/620/801 generated (nested sequences flattened into sibling anchored sequences; new `alt_anchor_tags` on `SequenceSchema`). 212 schemas = every non-service Prowide SRU 2025 MT. Bare `.sta` MT940/942 ingest via `swift_core::split_bare_statements` (used by `swiftpipe load` when a file has no FIN envelope). MT940/942/950 accept legacy `:28:` as well as `:28C:`. Generated samples are structure-only, so nested-sequence fidelity (anchor-wins conflicts) is untested against real messages.
+- **Fix: `swiftpipe run` ignored anchored sequences (2026-10-11)**: `run` and render validation parsed with plain `parse_message`, so schemas using `anchor_tag` (MT940/942/950, treasury 15x types, loops) were only correct under test. Both now use `parse_message_with_sequences(anchored_sequences(schema))`. Covered by `load_cli::load_bare_statements_wraps_and_types_each_statement` (MT942 with per-entry `:86:`).
