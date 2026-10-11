@@ -839,6 +839,11 @@ fn every_available_local_repro_case_is_declared_in_known_cases() {
 #[test]
 fn all_local_repro_cases_have_parseable_uhb_spec_tables() {
     let cache_dir = examples_dir().join("examples/.uhb");
+    if !cache_dir.is_dir() {
+        // The UHB cache is gitignored (fetched locally), so it is absent in CI.
+        eprintln!("skipping: {} not present", cache_dir.display());
+        return;
+    }
 
     for candidate in discover_reproducible_cases() {
         let mt = candidate.message.trim_start_matches("MT");

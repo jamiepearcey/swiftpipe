@@ -123,6 +123,11 @@ fn parse_uhb_file_with_fallback(path: &Path) -> (usize, usize, bool) {
 
 #[test]
 fn uhb_message_specs_are_parseable_with_table_parser() {
+    if !examples_dir().join("examples/.uhb").is_dir() {
+        // The UHB cache is gitignored (fetched locally), so it is absent in CI.
+        eprintln!("skipping: UHB cache not present");
+        return;
+    }
     let mut parsed = 0;
 
     for path in uhb_spec_files() {
