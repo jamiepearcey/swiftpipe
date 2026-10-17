@@ -35,10 +35,12 @@ fn main() -> Result<()> {
     //   snapshot  → static recon-snapshot.json (UI offline fallback)
     //   store     → materialise the Parquet read-model store (write side)
     //   serve     → query the store via DuckDB over HTTP (read side)
+    //   rae       → post the msg.* tables to a RAE engine (semantic ingress sink)
     match std::env::args().nth(1).as_deref() {
         Some("snapshot") => return run_snapshot(),
         Some("store") => return run_store(),
         Some("serve") => return run_serve_cmd(),
+        Some("rae") => return run_rae(),
         _ => {}
     }
 
@@ -363,6 +365,94 @@ fn run_serve_cmd() -> Result<()> {
         }
     }
     serve::run_serve(store, bind)
+}
+
+/// `ingest rae <files...> --base URL --source ID [--token T] [--schema-dir DIR]
+/// [--artifacts] [--dry-run]` — land the `msg.*` tables of
+/// docs/design/semantic-ingress-contract.md in a RAE engine. A re-send of the
+/// same file is a no-op (the engine answers 409 `already committed`).
+fn run_rae() -> Result<()> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let (mut base, mut source, mut token) = (None::<String>, None::<String>, None::<String>);
+    let mut schema_dir = PathBuf::from("examples/schemas");
+    let (mut artifacts, mut dry_run) = (false, false);
+    let mut args = std::env::args().skip(2);
+    while let Some(a) = args.next() {
+        let mut val = |name: &str| args.next().ok_or_else(|| anyhow!("{name} needs a value"));
+        match a.as_str() {
+            "--base" => base = Some(val("--base")?),
+            "--source" => source = Some(val("--source")?),
+            "--token" => token = Some(val("--token")?),
+            "--schema-dir" => schema_dir = PathBuf::from(val("--schema-dir")?),
+            "--artifacts" => artifacts = true,
+            "--dry-run" => dry_run = true,
+            "-h" | "--help" => {
+                eprintln!("usage: ingest rae <files...> --base <engine url> --source <custodian:BIC11|broker:name> [--token T] [--schema-dir DIR] [--artifacts] [--dry-run]");
+                return Ok(());
+            }
+            other if other.starts_with("--") => bail!("unknown option {other}"),
+            other => files.push(PathBuf::from(other)),
+        }
+    }
+    if files.is_empty() {
+        bail!("no input files (see --help)");
+    }
+    let source = ingest_rae::SourceId::parse(&source.ok_or_else(|| anyhow!("--source is required"))?)?;
+    let mut opts = ingest_rae::Options::new(source, schema_dir);
+    opts.artifacts = artifacts;
+    let poster = ingest_rae::HttpPoster::new(
+        &base.ok_or_else(|| anyhow!("--base is required"))?,
+        token,
+    );
+    let mut failed = 0;
+    for f in &files {
+        let name = f.display().to_string();
+        let res = (|| -> Result<ingest_rae::FileReport> {
+            let bytes = std::fs::read(f).with_context(|| format!("reading {name}"))?;
+            let hint = rae_format(f, &bytes)?;
+            let base_name = f.file_name().and_then(|n| n.to_str()).unwrap_or(&name);
+            let mut prepared = ingest_rae::prepare(&opts, base_name, Some(hint), &bytes)?;
+            if dry_run {
+                let mut rep = ingest_rae::FileReport::default();
+                rep.messages = prepared.landed.len();
+                return Ok(rep);
+            }
+            ingest_rae::post(&poster, &opts, &name, &mut prepared)
+        })();
+        match res {
+            Ok(r) => {
+                let tables: Vec<String> = r
+                    .tables
+                    .iter()
+                    .map(|(t, c)| {
+                        format!("{t}={} rows ({} landed, {} already)", c.rows, c.landed, c.already_landed)
+                    })
+                    .collect();
+                println!("{name}: {} messages; {}", r.messages, tables.join("; "));
+            }
+            Err(e) => {
+                failed += 1;
+                eprintln!("{name}: FAILED: {e:#}");
+            }
+        }
+    }
+    if failed > 0 {
+        bail!("{failed} of {} files failed", files.len());
+    }
+    Ok(())
+}
+
+/// The existing route detection, with a FIN fallback: a message type with
+/// neither `:61:` nor `:35B:` (MT599 ...) is still FIN and lands as `msg.raw` + `msg.field`.
+fn rae_format(path: &Path, bytes: &[u8]) -> Result<ingest_rae::Format> {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let text = std::str::from_utf8(bytes).map_err(|_| anyhow!("refused: not UTF-8"))?;
+    Ok(match detect(path, text) {
+        Ok(Route::CashCamt) => ingest_rae::Format::Camt,
+        Ok(Route::PositionsCsv) => ingest_rae::Format::Csv,
+        Ok(Route::CashMt940 | Route::PositionsMt) => ingest_rae::Format::Mt,
+        Err(_) => ingest_rae::detect_format(name, bytes)?,
+    })
 }
 
 fn parse_mt_securities(

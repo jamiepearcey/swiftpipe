@@ -1,0 +1,82 @@
+mt535_holdings_sample.fin#0	render_error(InvalidFieldPattern)
+mt536_two_instruments.fin#0	differs(41->41 rows)
+mt537_bond_sample.fin#0	differs(29->29 rows)
+mt537_gilt_sample.fin#0	differs(29->29 rows)
+mt537_sample.fin#0	differs(29->29 rows)
+mt537_two_fails.fin#0	differs(46->46 rows)
+mt940_break_sample.fin#0	render_error(MissingRequiredValue)
+mt940_sample.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/citi_mt515_confirmation_with_research_fee.fin	no_fin_message
+public-swift-samples/clearstream_mt380_foreign_exchange_order.fin	no_fin_message
+public-swift-samples/clearstream_mt545_receive_against_payment_confirmation.fin	no_fin_message
+public-swift-samples/clearstream_mt547_deliver_against_payment_confirmation.fin	no_fin_message
+public-swift-samples/clearstream_vestima_mt502_order_forwarded.fin	no_fin_message
+public-swift-samples/clearstream_vestima_mt509_validation_reply.fin	no_fin_message
+public-swift-samples/eurex_mt536_empty_statement_of_transactions.fin	no_fin_message
+public-swift-samples/generated/generated_MT102.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT104.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT107.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT110.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT201.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT203.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT204.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT304.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT330.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT350.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT364.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT365.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT410.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT412.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT420.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT422.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT430.fin#0	differs(3->2 rows)
+public-swift-samples/generated/generated_MT450.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT456.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT600.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT601.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT604.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT605.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT620.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT760.fin#0	differs(21->24 rows)
+public-swift-samples/generated/generated_MT767.fin#0	differs(10->9 rows)
+public-swift-samples/generated/generated_MT801.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT920.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT935.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT971.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/generated/generated_MT973.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/hkex_mt548_settlement_status_processing_advice.fin	no_fin_message
+public-swift-samples/kdd_mt544_receive_free_confirmation.fin	no_fin_message
+public-swift-samples/kdd_mt546_deliver_free_confirmation.fin	no_fin_message
+public-swift-samples/midclear_mt540_receive_free_local.fin	no_fin_message
+public-swift-samples/midclear_mt540_receive_free_local_cancellation.fin	no_fin_message
+public-swift-samples/midclear_mt541_receive_against_payment_local.fin	no_fin_message
+public-swift-samples/midclear_mt541_receive_against_payment_local_cancellation.fin	no_fin_message
+public-swift-samples/midclear_mt542_deliver_free_local.fin	no_fin_message
+public-swift-samples/midclear_mt542_deliver_free_local_cancellation.fin	no_fin_message
+public-swift-samples/midclear_mt543_deliver_against_payment_local.fin	no_fin_message
+public-swift-samples/midclear_mt543_deliver_against_payment_local_cancellation.fin	no_fin_message
+public-swift-samples/rosswift_mt549_request_for_statement.fin	no_fin_message
+public-swift-samples/rosswift_mt565_corporate_action_instruction.fin	no_fin_message
+public-swift-samples/rosswift_mt566_corporate_action_confirmation.fin	no_fin_message
+public-swift-samples/rosswift_mt567_corporate_action_status.fin	no_fin_message
+public-swift-samples/rosswift_mt568_corporate_action_narrative.fin	no_fin_message
+public-swift-samples/sourceforge_mt564_corporate_action_notification.fin	no_fin_message
+public-swift-samples/synthetic/synthetic_MT210.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/synthetic/synthetic_MT801.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/synthetic/synthetic_MT910.fin#0	differs(7->7 rows)
+public-swift-samples/synthetic/synthetic_MT942.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/synthetic/synthetic_MT950.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/tibco_mt535_statement_of_holdings.fin#0	render_error(InvalidFieldPattern)
+public-swift-samples/upstream/prowide-core-examples_MT537_large.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/upstream/prowide-core-examples_mt103.fin#0	differs(13->13 rows)
+public-swift-samples/upstream/prowide-core_MT101.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/upstream/prowide-core_MT300.fin#0	render_error(MissingRequiredValue)
+public-swift-samples/upstream/prowide-core_MT305.fin#0	differs(17->16 rows)
+public-swift-samples/upstream/prowide-core_MT306.fin#0	differs(35->12 rows)
+public-swift-samples/upstream/prowide-core_MT320.fin#0	differs(22->6 rows)
+public-swift-samples/upstream/prowide-core_MT340.fin#0	differs(28->9 rows)
+public-swift-samples/upstream/prowide-core_MT341.fin#0	differs(18->7 rows)
+public-swift-samples/upstream/prowide-core_MT360.fin#0	differs(87->18 rows)
+public-swift-samples/upstream/prowide-core_MT361.fin#0	differs(84->16 rows)
+public-swift-samples/upstream/prowide-core_MT362.fin#0	differs(23->10 rows)
+public-swift-samples/upstream/prowide-core_MT940_sample_JPchar.fin#0	render_error(MissingRequiredValue)
