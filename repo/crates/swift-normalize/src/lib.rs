@@ -23,7 +23,9 @@ pub fn classify(message_type: &str) -> EventKind {
         "MT535" => EventKind::Holding,
         "MT536" | "MT537" | "MT538" | "MT540" | "MT541" | "MT542" | "MT543" | "MT544" | "MT545"
         | "MT546" | "MT547" | "MT548" => EventKind::Settlement,
-        "MT515" | "MT518" => EventKind::TradeConfirm,
+        // The four confirmation types of the semantic ingress route (qw ADR-0101, contract §4):
+        // execution advice (MT513), confirmation (MT515), affirmation (MT517), market-side (MT518).
+        "MT513" | "MT515" | "MT517" | "MT518" => EventKind::TradeConfirm,
         _ => EventKind::Other,
     }
 }
@@ -449,6 +451,8 @@ mod tests {
         assert_eq!(classify("mt542"), EventKind::Settlement);
         assert_eq!(classify("MT537"), EventKind::Settlement);
         assert_eq!(classify("MT515"), EventKind::TradeConfirm);
+        assert_eq!(classify("MT513"), EventKind::TradeConfirm);
+        assert_eq!(classify("MT517"), EventKind::TradeConfirm);
         assert_eq!(classify("MT999"), EventKind::Other);
     }
 

@@ -73,3 +73,16 @@ fn ids_are_stable_across_runs() {
     assert_eq!(a.landed[0].raw.message_id, b.landed[0].raw.message_id);
     assert_eq!(a.srcns, b.srcns);
 }
+
+#[test]
+fn every_confirmation_type_yields_a_trade_confirm_event() {
+    // qw routes MT513/515/517/518 to security_confirm; each fixture carries one :35B: in TRADDET.
+    for file in ["mt513_sample.fin", "mt515_sample.fin", "mt517_sample.fin", "mt518_sample.fin"] {
+        let bytes = std::fs::read(ex().join(file)).unwrap();
+        let p = prepare(&opts("custodian:BANKBEBBXXX"), file, None, &bytes).unwrap();
+        let ev = &p.landed[0].events;
+        assert_eq!(ev.len(), 1, "{file}");
+        assert_eq!(ev[0].kind.as_str(), "trade_confirm", "{file}");
+        assert_eq!(ev[0].isin.as_deref(), Some("GB00B03MLX29"), "{file}");
+    }
+}
