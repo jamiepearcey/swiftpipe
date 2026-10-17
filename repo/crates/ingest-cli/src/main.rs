@@ -571,4 +571,20 @@ mod tests {
             Route::PositionsCsv
         );
     }
+
+    #[test]
+    fn rae_format_accepts_fin_the_old_detect_refuses() {
+        // An MT599 carries neither :61: nor :35B:, so `detect` bails; the sink still lands it.
+        let fin = b"{1:F01BANKBEBBAXXX0000000000}{2:I599BANKDEFFXXXXN}{4:\n:20:X\n:79:hello\n-}";
+        assert!(detect(Path::new("m.fin"), std::str::from_utf8(fin).unwrap()).is_err());
+        assert_eq!(
+            rae_format(Path::new("m.fin"), fin).unwrap(),
+            ingest_rae::Format::Mt
+        );
+        assert_eq!(
+            rae_format(Path::new("p.csv"), b"isin,quantity\n").unwrap(),
+            ingest_rae::Format::Csv
+        );
+        assert!(rae_format(Path::new("x"), b"hello").is_err());
+    }
 }
