@@ -16,6 +16,7 @@ members = [
     "crates/swift-mt940",
     "crates/swift-normalize",
     "crates/swift-schema",
+    "crates/swiftpipe-worker",
 ]
 resolver = "2"
 

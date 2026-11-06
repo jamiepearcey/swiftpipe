@@ -1,0 +1,20 @@
+[package]
+name = "swiftpipe-worker"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+publish = false
+description = "The swift_parse step worker (holon-http/1): reads an ingress inbox snapshot by reference, parses each file with the ingest-rae sink code and answers one Arrow table per msg.* table."
+
+[[bin]]
+name = "swiftpipe-worker"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+serde_json = "1"
+arrow = "55"
+ureq = "3"
+ingest-rae = { path = "../ingest-rae" }
+# Path dependency into the RAE checkout for now (the SDK is publishable later).
+rae-holon-worker = { path = "../../../../../rust-analytical-engine/api/crates/holon-worker" }

@@ -78,12 +78,39 @@ pub struct Prepared {
     pub no_schema: BTreeSet<String>,
 }
 
-struct Schemas {
+/// The MT schema catalogs, by message type (`MT513`). Loaded lazily from the
+/// schema dir, or all at once with [`Schemas::preload`] (a long-lived worker).
+pub struct Schemas {
     dir: PathBuf,
     cache: HashMap<String, Option<SchemaCatalog>>,
 }
 
 impl Schemas {
+    pub fn new(dir: impl Into<PathBuf>) -> Self {
+        Self { dir: dir.into(), cache: HashMap::new() }
+    }
+
+    /// Load every `mt<nnn>.yaml` in `dir` now; a type with no file still
+    /// falls back to the (absent) disk lookup.
+    pub fn preload(dir: impl Into<PathBuf>) -> Result<Self> {
+        let mut s = Self::new(dir);
+        for e in std::fs::read_dir(&s.dir)? {
+            let name = e?.file_name().to_string_lossy().to_string();
+            let Some(stem) = name.strip_suffix(".yaml") else { continue };
+            if stem.starts_with("mt") && stem[2..].chars().all(|c| c.is_ascii_digit()) {
+                let mtype = stem.to_uppercase();
+                let c = load_catalog(&s.dir, &mtype);
+                s.cache.insert(mtype, c);
+            }
+        }
+        Ok(s)
+    }
+
+    /// Types with a loaded, valid catalog.
+    pub fn loaded(&self) -> usize {
+        self.cache.values().filter(|c| c.is_some()).count()
+    }
+
     fn get(&mut self, mtype: &str) -> Option<&SchemaCatalog> {
         self.cache
             .entry(mtype.to_string())
@@ -101,6 +128,22 @@ fn load_catalog(dir: &Path, mtype: &str) -> Option<SchemaCatalog> {
 
 /// Parse a file into message rows; nothing is sent.
 pub fn prepare(opts: &Options, file_name: &str, hint: Option<Format>, bytes: &[u8]) -> Result<Prepared> {
+    prepare_with(opts, &mut Schemas::new(opts.schema_dir.clone()), file_name, hint, bytes, &|| false)
+}
+
+/// The text of the error [`prepare_with`] returns when `stop` turned true.
+pub const CANCELLED: &str = "cancelled";
+
+/// [`prepare`] against a caller-held [`Schemas`]; `stop` is checked between
+/// messages and turns the parse into a [`CANCELLED`] error.
+pub fn prepare_with(
+    opts: &Options,
+    schemas: &mut Schemas,
+    file_name: &str,
+    hint: Option<Format>,
+    bytes: &[u8],
+    stop: &dyn Fn() -> bool,
+) -> Result<Prepared> {
     let format = match hint {
         Some(f) => f,
         None => detect_format(file_name, bytes)?,
@@ -120,10 +163,6 @@ pub fn prepare(opts: &Options, file_name: &str, hint: Option<Format>, bytes: &[u
             camt_statements.len()
         ));
     }
-    let mut schemas = Schemas {
-        dir: opts.schema_dir.clone(),
-        cache: HashMap::new(),
-    };
     let mut out = Prepared {
         srcns: opts.source.srcns(&file_sha),
         file_sha256: file_sha.clone(),
@@ -131,8 +170,11 @@ pub fn prepare(opts: &Options, file_name: &str, hint: Option<Format>, bytes: &[u
         ..Default::default()
     };
     for m in &split.messages {
+        if stop() {
+            return Err(anyhow!(CANCELLED));
+        }
         let id = opts.source.message_id(&file_sha, m.offset);
-        let l = land_message(opts, &mut schemas, &mut out.no_schema, &file_sha, file_name, &id, m, &camt_statements)?;
+        let l = land_message(opts, schemas, &mut out.no_schema, &file_sha, file_name, &id, m, &camt_statements)?;
         out.landed.push(l);
     }
     Ok(out)
@@ -311,7 +353,7 @@ pub fn post(poster: &dyn Poster, opts: &Options, file: &str, p: &mut Prepared) -
     }
     let chunk = opts.chunk_messages.max(1);
     let sid = &opts.source.id;
-    let mut send = |rep: &mut FileReport, table: &'static str, batch: arrow::array::RecordBatch, pos: usize| -> Result<()> {
+    let send = |rep: &mut FileReport, table: &'static str, batch: arrow::array::RecordBatch, pos: usize| -> Result<()> {
         let c = rep.tables.entry(table).or_default();
         c.rows += batch.num_rows();
         c.posts += 1;
@@ -324,25 +366,9 @@ pub fn post(poster: &dyn Poster, opts: &Options, file: &str, p: &mut Prepared) -
     };
     for part in p.landed.chunks(chunk) {
         let pos = part.last().map(|l| l.offset).unwrap_or(0);
-        let frows: Vec<(&str, &str, &FieldRow)> = part
-            .iter()
-            .flat_map(|l| l.fields.iter().map(move |f| (sid.as_str(), l.raw.message_id.as_str(), f)))
-            .collect();
-        if !frows.is_empty() {
-            send(&mut rep, "msg.field", tables::field_batch(&frows)?, pos)?;
-        }
-        let ev: Vec<(i64, &SecurityEvent)> = part
-            .iter()
-            .flat_map(|l| l.events.iter().enumerate().map(|(i, e)| (i as i64, e)))
-            .collect();
-        if !ev.is_empty() {
-            send(&mut rep, "msg.security_event", tables::security_event_batch(&ev)?, pos)?;
-        }
-        let sts: Vec<&CashStatement> = part.iter().filter_map(|l| l.statement.as_ref()).collect();
-        if !sts.is_empty() {
-            send(&mut rep, "msg.cash_statement", tables::cash_statement_batch(&sts)?, pos)?;
-            if sts.iter().any(|s| !s.entries.is_empty()) {
-                send(&mut rep, "msg.cash_entry", tables::cash_entry_batch(&sts)?, pos)?;
+        for (table, batch) in typed_batches(sid, part)? {
+            if batch.num_rows() > 0 {
+                send(&mut rep, table, batch, pos)?;
             }
         }
     }
@@ -352,6 +378,33 @@ pub fn post(poster: &dyn Poster, opts: &Options, file: &str, p: &mut Prepared) -
         send(&mut rep, "msg.raw", tables::raw_batch(&raws)?, pos)?;
     }
     Ok(rep)
+}
+
+/// The typed tables of some landed messages, in post order (`msg.field`,
+/// `msg.security_event`, `msg.cash_statement`, `msg.cash_entry`); a table with
+/// no rows is an empty batch of its contract schema. `msg.raw` is [`raw_batch`].
+pub fn typed_batches(source_id: &str, landed: &[Landed]) -> Result<Vec<(&'static str, arrow::array::RecordBatch)>> {
+    let frows: Vec<(&str, &str, &FieldRow)> = landed
+        .iter()
+        .flat_map(|l| l.fields.iter().map(move |f| (source_id, l.raw.message_id.as_str(), f)))
+        .collect();
+    let ev: Vec<(i64, &SecurityEvent)> = landed
+        .iter()
+        .flat_map(|l| l.events.iter().enumerate().map(|(i, e)| (i as i64, e)))
+        .collect();
+    let sts: Vec<&CashStatement> = landed.iter().filter_map(|l| l.statement.as_ref()).collect();
+    Ok(vec![
+        ("msg.field", tables::field_batch(&frows)?),
+        ("msg.security_event", tables::security_event_batch(&ev)?),
+        ("msg.cash_statement", tables::cash_statement_batch(&sts)?),
+        ("msg.cash_entry", tables::cash_entry_batch(&sts)?),
+    ])
+}
+
+/// The `msg.raw` rows of some landed messages.
+pub fn raw_batch(landed: &[Landed]) -> Result<arrow::array::RecordBatch> {
+    let raws: Vec<RawRow> = landed.iter().map(|l| l.raw.clone()).collect();
+    tables::raw_batch(&raws)
 }
 
 /// Prepare and post one file.
